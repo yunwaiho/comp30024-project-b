@@ -3,8 +3,8 @@ This module processes information regarding the game state and keeps
 track of the board
 """
 
-import polkadots.search.util as util
-import polkadots.search.tokens as tokens
+import random_player.search.util as util
+import random_player.search.tokens as tokens
 
 
 class Board:
@@ -56,8 +56,8 @@ class Board:
         util.print_board(self.game_state)
 
     # Updates the board after move
-    def move_token(self, n, xy1, xy2, check_valid=True):
-        if check_valid and not tokens.is_valid_move(self, xy1, xy2):
+    def move_token(self, n, xy1, xy2):
+        if not tokens.is_valid_move(self, xy1, xy2):
             raise Exception("This is not a valid move.")
         else:
             new_size = n

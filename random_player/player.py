@@ -1,6 +1,6 @@
 import json
-import polkadots.search.game as game
-import polkadots.search.agent as agent
+import random_player.search.game as game
+import random_player.search.agent as agent
 
 
 class ExamplePlayer:
@@ -22,8 +22,6 @@ class ExamplePlayer:
 
         self.game = game.Game(data)
         self.colour = colour
-        self.agent = agent.Agent(colour)
-        self.turn_num = 0
 
     def action(self):
         """
@@ -35,14 +33,13 @@ class ExamplePlayer:
         represented based on the spec's instructions for representing actions.
         """
         # TODO: Decide what action to take, and return it
-
-        search_depth = 3
-        alpha = float("-inf")
-        beta = float("inf")
+        import random
 
         game_state = self.game.get_game_state()
 
-        strategy, score = self.agent.maximiser(game_state, search_depth, alpha, beta, self.colour)
+        available = agent.available_states(game_state, self.colour)
+
+        strategy = random.choice(available)
 
         n, xy, move, distance = strategy
         if move == "Boom":
@@ -86,4 +83,4 @@ class ExamplePlayer:
             xy1 = action[2]
             xy2 = action[3]
 
-            self.game.board.move_token(n, xy1, xy2, check_valid=False)
+            self.game.board.move_token(n, xy1, xy2)

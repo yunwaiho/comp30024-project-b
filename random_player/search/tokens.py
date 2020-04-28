@@ -3,14 +3,11 @@ Module for Tokens!
 """
 
 
-def available_moves():
-    import random
-
-    lst = ["Down", "Left", "Right", "Up"]
-
-    random.shuffle(lst)
-
-    return ["Boom"] + lst
+def available_moves(colour):
+    if colour == "black":
+        return "Boom", "Down", "Left", "Right", "Up"
+    else:
+        return "Boom", "Up", "Left", "Right", "Down",
 
 
 def out_of_board(xy):

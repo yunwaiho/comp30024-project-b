@@ -2,70 +2,91 @@ import polkadots.search.game as game
 import polkadots.search.tokens as tokens
 
 
-def maximiser(game_state, past_states, depth, player):
+class Agent:
 
-    # Base Case
-    if depth == 0:
-        return None, score(game_state, player), depth
+    def __init__(self, player):
+        self.player = player
+        self.other = game.other_player(player)
 
-    if player == player:
-        max_val = float("-inf")
-        best_depth = float("-inf")
+    def maximiser(self, game_state, depth, alpha, beta, player):
+
+        # Base Case
+        if depth == 0 or game.end(game_state):
+            return None, score(game_state, self.player)
+
         best_strategy = None
 
-        next_states = available_states(game_state, player)
+        if self.player == player:
 
-        for strategy, next_state in next_states:
-            if next_state in past_states:
-                continue
+            next_states = available_states(game_state, player)
 
-            if trade_pieces(game_state, next_state, player) or not next_state[game.other_player(player)]:
-                return strategy, float("inf"), depth-1
+            for strategy, next_state in next_states:
 
-            previous_states = past_states + [next_state]
-            next_strategy, val, max_depth = maximiser(next_state, previous_states, depth - 1, player)
+                next_strategy, val = self.maximiser(next_state, depth - 1, alpha, beta, self.other)
 
-            if val > max_val:
-                max_val = val
-                best_strategy = strategy
-            if val == max_val and max_depth > best_depth:
-                max_val = val
-                best_strategy = strategy
-                best_depth = max_depth
+                if val >= alpha:
+                    alpha = val
+                    best_strategy = strategy
 
-        return best_strategy, max_val, best_depth
+                if alpha >= beta:
+                    return best_strategy, beta
 
-    if player == game.other_player(player):
-        pass
+            return best_strategy, alpha
+
+        if self.player != player:
+
+            next_states = available_states(game_state, player)
+
+            for strategy, next_state in next_states:
+
+                next_strategy, val = self.maximiser(next_state, depth - 1, alpha, beta, self.player)
+
+                if val <= beta:
+                    beta = val
+                    best_strategy = strategy
+
+                if beta <= alpha:
+                    return best_strategy, alpha
+
+            return best_strategy, beta
 
 
 # How to define the score of the current game state
 # Open to change
-# White wants to maximise this
-# Black wants to minimise this
 def score(game_state, player):
-    # Winning Condition for white
-    if not game_state[game.other_player(player)]:
-        return float("inf")
+    # IMPORT NUMPY FOR VECTOR CALC
+
+    other = game.other_player(player)
+
+    # Winning Condition for player
+    if not game_state[player]:
+        return float("-inf")
     else:
-        if not game_state[player]:
-            return float("-inf")
+        if not game_state[other]:
+            return float("inf")
 
-    home_pieces = count_pieces(game_state[player])
-    away_pieces = count_pieces(game_state[game.other_player(player)])
-    dist_to_away = distance_from_centroid(game_state, player, own_centroid=False)
+    home_pieces = game_state[player]
+    away_pieces = game_state[other]
 
-    home_stacks = count_stacks(game_state[player])
-    away_stacks = count_stacks(game_state[game.other_player(player)])
+    home_num = count_pieces(home_pieces)
+    away_num = count_pieces(away_pieces)
+
+    home_stacks = count_stacks(home_pieces)
+    away_stacks = count_stacks(away_pieces)
+
+    home_stack_size = average_stack_size(home_pieces)
+    away_stack_size = average_stack_size(away_pieces)
 
     home_spread = distance_from_centroid(game_state, player, own_centroid=True)
-    away_spread = distance_from_centroid(game_state, game.other_player(player), own_centroid=True)
+    away_spread = distance_from_centroid(game_state, other, own_centroid=True)
 
-    booms_n, booms_center, boom_weights = booms_required(game_state, player)
+    home_boom_area = boom_area(home_pieces)
 
-    boom_dist = dist_to_boom(game_state, player, booms_center, boom_weights)
+    home_booms_needed, away_clusters, away_cluster_size = booms_required(game_state, player)
 
-    final = home_pieces - away_pieces - 1/(home_stacks*home_spread)
+    avg_boom_dist = dist_to_boom(game_state, player, booms_center=away_clusters, boom_weights=away_cluster_size)
+
+    final = home_num - away_num + home_stacks + home_stack_size - home_spread - home_boom_area - avg_boom_dist
 
     return final
 
@@ -87,16 +108,22 @@ def available_states(game_state, player):
                 temp_game.boom(xy, player)
                 temp_game_state = temp_game.get_game_state()
 
-                if count_pieces(temp_game_state[player]) < booms_required(temp_game_state, player)[0]:
-                    continue
+                # If current number of home pieces <= current number of away pieces
+                if count_pieces(game_state[player]) < count_pieces(game_state[game.other_player(player)]):
+                    home_diff = count_pieces(game_state[player]) - count_pieces(temp_game_state[player])
+                    away_diff = count_pieces(game_state[game.other_player(player)]) \
+                                - count_pieces(temp_game_state[game.other_player(player)])
+
+                    if home_diff >= away_diff:
+                        continue
 
                 available.append([(None, xy, move, None), temp_game.get_game_state()])
             else:
                 for distance in range(piece[0]):
-                    distance += 1
+                    distance = piece[0] - distance
 
                     for amount in range(piece[0]):
-                        amount += 1
+                        amount = piece[0] - amount
 
                         temp_game = game.Game(game_state)
                         if temp_game.is_valid_move(xy, move, distance, player):
@@ -114,28 +141,18 @@ def count_pieces(pieces):
     return n
 
 
+# Counts the number of stacks
 def count_stacks(pieces):
     return len(pieces)
 
 
-# Check to always trade one for one or more
-def trade_pieces(game_state, next_state, player):
-    # Boom was used
-    if count_pieces(next_state[player]) < count_pieces(game_state[player]):
-
-        # Boom killed some black pieces
-        if count_pieces(next_state[game.other_player(player)]) < count_pieces(game_state[game.other_player(player)]):
-
-            # Enough remaining pieces to cover the opposition pieces
-            if count_pieces(next_state[player]) >= booms_required(next_state, player)[0]:
-                return True
-
-    return False
+# Counts the average stack size
+def average_stack_size(pieces):
+    return count_stacks(pieces)/count_pieces(pieces)
 
 
-# Returns average center of mass of all pieces of other colour
+# Returns average center of mass of all pieces player colour
 def centre_of_mass(game_state, player):
-
     x, y, n = 0, 0, 0
 
     for piece in game_state[player]:
@@ -143,10 +160,10 @@ def centre_of_mass(game_state, player):
         y += piece[2]
         n += 1
 
-    return x/n, y/n
+    return x / n, y / n
 
 
-# Returns distance of a colours pieces from its centre of mass
+# Returns average distance of a colours pieces from a colour's centre of mass
 def distance_from_centroid(game_state, player, own_centroid):
     from math import pow, sqrt
 
@@ -160,14 +177,23 @@ def distance_from_centroid(game_state, player, own_centroid):
         dist += sqrt(pow(piece[2] - y_c, 2) + pow(piece[1] - x_c, 2))
         n += 1
 
-    if dist==0:
+    if dist == 0:
         return 1
 
-    return dist/n
+    return dist / n
 
 
 # Finds the number of booms needed using single-linkage clustering
+# Inspired by Krushals Algorithm
 def booms_required(game_state, player):
+    """
+
+    :param game_state: current state of the game
+    :param player: home player colour
+    :return: n: (len(sets)) the number of booms required to kill all enemies currently
+             xy: (centroids) list of size n, showing the centroids of where to boom to remove all enemies
+             cluster: (weights) list of size n, the number enemy pieces in each cluster
+    """
     from math import pow, sqrt
 
     def find_set(p, s):
@@ -227,11 +253,12 @@ def booms_required(game_state, player):
         for piece in cluster:
             x += piece[0]
             y += piece[1]
-        centroids.append((x/len(cluster), y/len(cluster)))
+        centroids.append((x / len(cluster), y / len(cluster)))
 
     return len(sets), centroids, weights
 
 
+# Returns average distance of a colours piece to each boom centroid, weighted by the size of cluster
 def dist_to_boom(game_state, player, booms_center, boom_weights):
     from math import pow, sqrt
 
@@ -244,4 +271,24 @@ def dist_to_boom(game_state, player, booms_center, boom_weights):
             dist += weight * sqrt(pow(piece[2] - y, 2) + pow(piece[1] - x, 2))
             n += weight
 
-    return dist/n
+    return dist / n
+
+
+# Returns the number of spots that are covered by booms
+def boom_area(pieces):
+
+    locs = set()
+
+    for piece in pieces:
+        x, y = piece[1], piece[2]
+
+        for i in range(x - 1, x + 1 + 1):
+            for j in range(y - 1, y + 1 + 1):
+                ij = (i, j)
+
+                if tokens.out_of_board(ij):
+                    continue
+
+                locs.union(set(ij))
+
+    return len(locs)

@@ -2,8 +2,8 @@
 Module to run the game
 """
 
-from polkadots.search.board import Board
-import polkadots.search.tokens as tokens
+from random_player.search.board import Board
+import random_player.search.tokens as tokens
 
 
 class Game:

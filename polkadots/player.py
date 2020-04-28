@@ -1,4 +1,5 @@
 import json
+import numpy as np
 import polkadots.search.game as game
 import polkadots.search.agent as agent
 
@@ -23,7 +24,12 @@ class ExamplePlayer:
         self.game = game.Game(data)
         self.colour = colour
         self.agent = agent.Agent(colour)
-        self.turn_num = 0
+
+        self.turn_num = 1
+        self.token_num = 12
+        self.past_states = []
+
+        self.state_score = {}
 
     def action(self):
         """
@@ -36,13 +42,30 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-        search_depth = 3
+        import math
+
+        # Computations
+        c = 3600
+        # Branching Factor
+        b = 5 * self.token_num
+
+        # Derived by computations = b^d
+        search_depth = max(1, round(math.log(c) / math.log(b)))
+
+        search_depth = 2
+
         alpha = float("-inf")
         beta = float("inf")
 
         game_state = self.game.get_game_state()
 
-        strategy, score = self.agent.maximiser(game_state, search_depth, alpha, beta, self.colour)
+        strategy, score, features = self.agent.maximiser(game_state, game_state, search_depth, self.past_states, alpha, beta, self.colour)
+
+        #print(features)
+
+        features = np.append(features, score)
+
+        self.state_score[self.turn_num] = features
 
         n, xy, move, distance = strategy
         if move == "Boom":
@@ -87,3 +110,18 @@ class ExamplePlayer:
             xy2 = action[3]
 
             self.game.board.move_token(n, xy1, xy2, check_valid=False)
+
+        game_state = self.game.get_game_state()
+
+        self.turn_num += 1
+        self.token_num = agent.count_pieces(game_state["white"]) + agent.count_pieces(game_state["black"])
+
+        import pandas as pd
+
+        #print(self.state_score)
+
+        df = pd.DataFrame(self.state_score)
+
+        df = df.T
+
+        df.to_excel("data.xlsx")

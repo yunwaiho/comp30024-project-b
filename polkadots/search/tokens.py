@@ -6,11 +6,13 @@ Module for Tokens!
 def available_moves():
     import random
 
-    lst = ["Down", "Left", "Right", "Up"]
+    vert = ["Down", "Up"]
+    long = ["Left", "Right"]
 
-    random.shuffle(lst)
+    random.shuffle(vert)
+    random.shuffle(long)
 
-    return ["Boom"] + lst
+    return ["Boom"] + vert + long
 
 
 def out_of_board(xy):

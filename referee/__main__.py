@@ -62,5 +62,6 @@ def main():
     # If it's another kind of error then it might be coming from the player
     # itself? Then, a traceback will be more helpful.
 
+
 if __name__ == '__main__':
     main()

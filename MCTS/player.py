@@ -22,9 +22,12 @@ class ExamplePlayer:
 
         self.game = game.Game(data)
         self.colour = colour
-        self.agent = agent.Agent(self.game, colour)
+        self.past_states = []
+
+        self.agent = agent.Agent(self.game, colour, self.past_states, trade_prop=0)
 
         self.home_tokens = 12
+        self.away_tokens = 12
         self.turn = 0
 
     def action(self):
@@ -40,13 +43,20 @@ class ExamplePlayer:
 
         game_state = self.game.get_game_state()
 
-        self.home_tokens = len(game_state[self.colour])
+        self.past_states.append(game_state[self.colour])
 
-        simulations = 5*self.home_tokens
+        self.home_tokens = sum([x[0] for x in game_state[self.colour]])
+        self.away_tokens = sum([x[0] for x in game_state[game.other_player(self.colour)]])
 
+        simulations = 7*self.home_tokens
         search_depth = 3
 
-        strategy = self.agent.monte_carlo(game_state, simulations, search_depth)
+        if self.agent.turn <= 5 and len(game_state[self.colour]) > 7:
+            strategy = self.agent.stack_up()
+        elif self.away_tokens == 1 and self.home_tokens >= 1:
+            strategy = self.agent.one_enemy_endgame()
+        else:
+            strategy = self.agent.monte_carlo(game_state, simulations, search_depth)
 
         n, xy, move, distance = strategy
         if move == "Boom":
@@ -85,6 +95,11 @@ class ExamplePlayer:
             xy = action[1]
             self.game.boom(xy, colour)
 
+            if colour == self.colour:
+                self.agent.home_recently_moved = None
+            else:
+                self.agent.away_recently_moved = None
+
         else:
             n = action[1]
             xy1 = action[2]
@@ -92,7 +107,13 @@ class ExamplePlayer:
 
             self.game.board.move_token(n, xy1, xy2, check_valid=False)
 
+            if colour == self.colour:
+                self.agent.home_recently_moved = xy2
+            else:
+                self.agent.away_recently_moved = xy2
+
         self.turn += 1
+        self.agent.turn = self.turn//2
 
     def end(self):
 

@@ -7,7 +7,7 @@ import MPM.search.game as game
 import numpy as np
 
 
-def eval_function(curr_state, game_state, player, curr_state_check):
+def eval_function(curr_state, game_state, player, curr_state_check=False):
 
     # Write a get turn function
 
@@ -64,6 +64,14 @@ def count_pieces(pieces):
 # Counts the number of stacks
 def count_stacks(pieces):
     return len(pieces)
+
+
+# Counts the number of pieces for both players
+def count_all(game_state, player):
+    home = sum([x[0] for x in game_state[player]])
+    away = sum([x[0] for x in game_state[game.other_player(player)]])
+
+    return home, away
 
 
 # Counts the average stack size

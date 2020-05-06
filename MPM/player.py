@@ -25,7 +25,7 @@ class ExamplePlayer:
         self.colour = colour
 
         self.agent = agent.Agent(self.game, self.game_state, colour)
-        self.max_depth = 4
+        self.max_depth = 3
         self.threshold = 0
 
         self.home_tokens = 12
@@ -50,7 +50,9 @@ class ExamplePlayer:
         self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
-            strategy = self.agent.one_enemy_endgame()
+            strategy = self.agent.one_enemy_endgame(self.threshold, self.max_depth)
+        elif self.away_tokens == 2 and self.home_tokens >= 2:
+            strategy = self.agent.two_enemy_endgame(self.threshold, self.max_depth)
         else:
             strategy, val = self.agent.mp_mix(self.threshold, self.max_depth)
 

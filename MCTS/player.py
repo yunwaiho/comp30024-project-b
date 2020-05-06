@@ -51,9 +51,7 @@ class ExamplePlayer:
         simulations = 7*self.home_tokens
         search_depth = 3
 
-        if self.agent.turn <= 5 and len(game_state[self.colour]) > 7:
-            strategy = self.agent.stack_up()
-        elif self.away_tokens == 1 and self.home_tokens >= 1:
+        if self.away_tokens == 1 and self.home_tokens >= 1:
             strategy = self.agent.one_enemy_endgame()
         else:
             strategy = self.agent.monte_carlo(game_state, simulations, search_depth)

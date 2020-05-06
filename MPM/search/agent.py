@@ -54,23 +54,23 @@ class Agent:
 
         # Protect our babies
         if score_diff > paranoid_threshold:
-            strategy = "p"
+            decision = "p"
         # Kill their babies
         else:
-            strategy = "o"
+            decision = "o"
 
         alpha = float("-inf")
         beta = float("inf")
-        next_moves = None
 
-        for depth in range(1, max_depth + 1):
-            next_moves = self.strategy(curr_state=self.game_state, node=self.root, depth=depth,
-                                       alpha=alpha, beta=beta, player=self.player, strategy=strategy,
-                                       next_moves=next_moves)
+        if self.root is None:
+            self.root = self.make_node(self.game_state, self.game_state, self.player, decision)
 
-        return next_moves[0]
+        for depth in range(1, max_depth):
+            strategy = self.strategy(node=self.root, curr_state=self.game_state, depth=depth,
+                                     alpha=alpha, beta=beta, player=self.player, decision=decision)
+        return strategy
 
-    def strategy(self, curr_state, node, depth, alpha, beta, player, strategy, previous_moves):
+    def strategy(self, node, curr_state, depth, alpha, beta, player, decision):
         """
         Regular minimax function, with the difference being strategy on how the score is calculated
 
@@ -78,44 +78,54 @@ class Agent:
         Offensive strategy wants to maximise the difference between the player's score
         """
 
-        if not None:
-
+        game_state = node.game_state
 
         # Base Case
         if depth == 0 or game.end(game_state):
 
             home_eval, away_eval = self.score(curr_state, game_state)
 
-            if strategy == "p":
+            if decision == "p":
                 return None, home_eval
             else:
                 return None, (home_eval - away_eval)
 
+        if node.children is None:
+            node.children = self.get_children(curr_state, game_state, player, decision)
+
         best_strategy = None
-        next_states = self.get_state_utility(curr_state, game_state, player, strategy)
+        next_states = node.children
+        better_children = []
 
         if self.player == player:
-            for node in next_states:
-                strategy, next_state = node.previous_move, node.game_state
+            for child_node in next_states:
+                strategy, next_state = child_node.previous_move, child_node.game_state
 
-                next_strategy, val = self.strategy(curr_state, next_state, depth-1, alpha, beta, self.other, strategy)
+                next_strategy, val = self.strategy(child_node, curr_state, depth-1, alpha, beta, self.other, decision)
+
+                better_children.append((val, child_node))
+
                 if val >= alpha:
                     alpha = val
                     best_strategy = strategy
                 if alpha > beta:
-
                     break
 
         if self.player != player:
-            for node in next_states:
-                strategy, next_state = node.previous_move, node.game_state
+            for child_node in next_states:
+                strategy, next_state = child_node.previous_move, child_node.game_state
 
-                next_strategy, val = self.strategy(curr_state, next_state, depth-1, alpha, beta, self.player, strategy)
+                next_strategy, val = self.strategy(child_node, curr_state, depth-1, alpha, beta, self.player, decision)
+
+                better_children.append((val, child_node))
+
                 if val <= beta:
                     beta = val
                     best_strategy = strategy
                 if beta < alpha:
                     break
+
+        node.children = self.reorder_nodes(better_children)
 
         if self.player == player:
             if alpha > beta:
@@ -250,45 +260,163 @@ class Agent:
             return best_strategy, best_eval
     """
 
-    def one_enemy_endgame(self):
+    def make_node(self, curr_state, game_state, player, strategy):
+
+        node_children = self.get_children(curr_state, game_state, player, strategy)
+        node = self.Node((None, game_state), player, node_children)
+        return node
+
+    def get_children(self, curr_state, game_state, player, strategy):
+        children = []
+        next_states = self.available_states(game_state, player)
+
+        for next_strategy, next_state in next_states:
+            state_score = self.utility(curr_state, next_state, strategy)
+            children.append((state_score, (next_strategy, next_state)))
+
+        ordered_children = self.reorder_nodes(children)
+        children = [self.Node(x, game.other_player(player), None) for x in ordered_children]
+        return children
+
+    @staticmethod
+    def reorder_nodes(nodes):
+        indices = [(x[0], i) for i, x in enumerate(nodes)]
+        indices = sorted(indices, reverse=True)
+        reordered = [nodes[i][1] for x, i in indices]
+        return reordered
+
+    def one_enemy_endgame(self, threshold, max_depth, two_enemy=False):
 
         game_state = self.game.get_game_state()
+
+        # If enemy can draw or we can win
+        for piece in game_state[self.player]:
+            home_b = features.count_pieces(game_state[self.player])
+            temp_game = game.Game(game_state)
+            temp_game.boom((piece[1], piece[2]), self.player)
+            home_a = features.count_pieces(temp_game.get_game_state()[self.player])
+            if not temp_game.get_game_state()[self.player] or (two_enemy and home_b-home_a >= 2):
+                strategy, val = self.mp_mix(threshold, max_depth)
+                return strategy
+            if not temp_game.get_game_state()[self.other]:
+                return None, (piece[1], piece[2]), "Boom", None
+
         enemy = game_state[self.other][0]
         enemy_xy = enemy[1], enemy[2]
 
         ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
         ally_xy = ally[1], ally[2]
 
-        width = enemy_xy[0] - ally_xy[0]
-        height = enemy_xy[1] - ally_xy[1]
-
-        if abs(width) <= 1 and abs(height) <= 1:
+        # Close enough to boom
+        if abs(enemy_xy[1] - ally_xy[0]) <= 1 and abs(enemy_xy[2] - ally_xy[1]) <= 1:
             return None, ally_xy, "Boom", None
+
+        return self.go_there(1, ally, enemy_xy)
+
+    # Doesn't take into account draws
+    def two_enemy_endgame(self, threshold, max_depth):
+        game_state = self.game_state
+        enemy_stacks = len(game_state[self.other])
+
+        for piece in game_state[self.player]:
+            temp_game = game.Game(game_state)
+            temp_game.boom((piece[1], piece[2]), self.player)
+            if not temp_game.get_game_state()[self.player]:
+                strategy, val = self.mp_mix(threshold, max_depth)
+                return strategy
+            if not temp_game.get_game_state()[self.other]:
+                return None, (piece[1], piece[2]), "Boom", None
+
+        # One stack
+        if enemy_stacks == 1:
+            enemy = game_state[self.other][0]
+            enemy_xy = enemy[1], enemy[2]
+
+            ally = self.closest_npiece(game_state, 2, self.player, enemy_xy)
+            if ally is None:
+                return self.make_stack(game_state)
+
+            ally_xy = ally[1], ally[2]
+            enemy_corner_xy = self.get_nearest_corner(ally_xy, enemy_xy)
+
+            return self.go_there(2, ally, enemy_corner_xy)
+
+        # Two seperate stacks
+        else:
+            return self.one_enemy_endgame(threshold, max_depth, two_enemy=True)
+
+    def get_nearest_corner(self, ally_xy, enemy_xy):
+        from math import sqrt, pow
+
+        closest = None
+        min_dist = float("inf")
+        horizontal = [-1, 1]
+        vertical = [-1, 1]
+
+        for i in horizontal:
+            for j in vertical:
+                ij = enemy_xy[0] + i, enemy_xy[1] + j
+
+                if tokens.out_of_board(ij):
+                    continue
+                dist = sqrt(pow(ally_xy[0] - ij[0], 2) + pow(ally_xy[1] - ij[1], 2))
+
+                if dist < min_dist:
+                    min_dist = dist
+                    closest = ij
+        return closest
+
+    def make_stack(self, game_state):
+
+        min_dist = float("inf")
+        pieces = None
+
+        for piece1 in game_state[self.player]:
+            for piece2 in game_state[self.player]:
+                if piece1 == piece2:
+                    continue
+
+                dist = piece1[1] - piece2[1] + piece1[2] - piece2[2]
+                dist = dist/max(piece1[0], piece2[0])
+
+                if dist < min_dist:
+                    min_dist = dist
+                    pieces = piece1, piece2
+
+        if pieces[0][0] > pieces[1][0]:
+            return self.go_there(pieces[0][0], pieces[0], pieces[1])
+        else:
+            return self.go_there(pieces[1][0], pieces[1], pieces[0])
+
+    def go_there(self, n, piece, get_to):
+        piece_xy = piece[1], piece[2]
+        width = get_to[0] - piece[1]
+        height = get_to[1] - piece[2]
 
         # Move vertically
         if abs(height) > abs(width):
-            if ally[0] >= abs(height):
+            if piece[0] >= abs(height):
                 if height > 0:
-                    return 1, ally_xy, "Up", abs(height)
+                    return n, piece_xy, "Up", abs(height)
                 else:
-                    return 1, ally_xy, "Down", abs(height)
+                    return n, piece_xy, "Down", abs(height)
             else:
                 if height > 0:
-                    return ally[0], ally_xy, "Up", ally[0]
+                    return piece[0], piece_xy, "Up", piece[0]
                 else:
-                    return ally[0], ally_xy, "Down", ally[0]
+                    return piece[0], piece_xy, "Down", piece[0]
         # Move horizontally
         else:
-            if ally[0] >= abs(width):
+            if piece[0] >= abs(width):
                 if width > 0:
-                    return 1, ally_xy, "Right", abs(width)
+                    return n, piece_xy, "Right", abs(width)
                 else:
-                    return 1, ally_xy, "Left", abs(width)
+                    return n, piece_xy, "Left", abs(width)
             else:
                 if width > 0:
-                    return ally[0], ally_xy, "Right", ally[0]
+                    return piece[0], piece_xy, "Right", piece[0]
                 else:
-                    return ally[0], ally_xy, "Left", ally[0]
+                    return piece[0], piece_xy, "Left", piece[0]
 
     def score(self, curr_state, game_state):
 
@@ -297,8 +425,7 @@ class Agent:
         if game_state_str in self.tt:
             home_eval, away_eval = self.tt[game_state_str]
         else:
-            home_eval = features.eval_function(curr_state, game_state, self.player)
-            away_eval = features.eval_function(curr_state, game_state, self.other)
+            home_eval, away_eval = features.eval_function(self, curr_state, game_state, self.player, self.turn)
 
             self.tt[game_state_str] = (home_eval, away_eval)
 
@@ -386,27 +513,6 @@ class Agent:
                 return all_rational_available
 
         return available
-
-    def get_state_utility(self, curr_state, game_state, player, strategy):
-
-        if self.root is None or self.root.children is None:
-            children = []
-            next_states = self.available_states(game_state, player)
-
-            for next_strategy, next_state in next_states:
-                state_score = self.utility(curr_state, next_state, strategy)
-                children.append((state_score, (next_strategy, next_state)))
-
-            indices = [(x[0], i) for i, x in enumerate(children)]
-            ordered_children = [children[i][1] for x, i in indices]
-            children = [self.Node(x, game.other_player(player), None) for x in ordered_children]
-
-            if self.root is None:
-                self.root = self.Node((None, curr_state), self.player, children)
-            else:
-                self.root.children = children
-
-        return self.root.children
 
     # Can be replaced with another node utility function
     def utility(self, curr_state, next_state, strategy):
@@ -504,6 +610,7 @@ class Agent:
 
         return False
 
+    # Subject to change
     @staticmethod
     def is_bad_boom(home_b, home_a, away_b, away_a):
         diff_b = home_b - away_b
@@ -539,6 +646,56 @@ class Agent:
                 closest_ally = piece
 
         return closest_ally
+
+    def get_board_score(self, game_state, player):
+
+        other_scores = 0
+        total_scores = 0
+
+        for piece in game_state[player]:
+            xy = piece[1], piece[2]
+            position_score = 12 - piece[0]
+
+            other, total = self.count_adjacent(player, xy)
+
+            other_n = other.count("1")
+            total_n = total.count("1")
+
+            other_score = self.find_pattern(other, other_n) * position_score
+            total_score = self.find_pattern(total, total_n) * position_score
+
+            other_scores += other_score
+            total_scores += total_score
+
+        if total_scores == 0:
+            return 0
+        else:
+            return other_scores / total_scores
+
+    @staticmethod
+    def find_pattern(string, string_n):
+        board_config = tokens.board_configs()
+
+        if string_n == 0:
+            return 0
+        if string_n == 8:
+            return 8 * 8
+        if string_n > 4:
+            string = string.replace("1", "a")
+            string = string.replace("0", "1")
+            string = string.replace("a", "0")
+
+        config = board_config[str(string_n)]
+
+        n = 0
+        value = 0
+
+        for key, val in config.items():
+            n += val
+            if key in 2 * string or key in 2 * string[::-1]:
+                value = val
+
+        return string_n * string_n * (1 - value / n)
 
 
 def get_str(game_state):

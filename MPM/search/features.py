@@ -7,7 +7,7 @@ import MPM.search.game as game
 import numpy as np
 
 
-def eval_function(curr_state, game_state, player, curr_state_check=False):
+"""def eval_function(curr_state, game_state, player, curr_state_check=False):
 
     # Write a get turn function
 
@@ -52,6 +52,105 @@ def eval_function(curr_state, game_state, player, curr_state_check=False):
         final = np.dot(total_features, weights)
         return final
 
+"""
+
+
+def eval_function(agent, curr_state, game_state, player, turn):
+    other = game.other_player(player)
+
+    tokens.board_configs()
+
+    b_home_pieces = curr_state[player]
+    b_away_pieces = curr_state[other]
+
+    a_home_pieces = game_state[player]
+    a_away_pieces = game_state[other]
+
+    home_num = count_pieces(a_home_pieces)
+    away_num = count_pieces(a_away_pieces)
+    total_num = home_num + away_num
+
+    if total_num == 0:
+        return 0, 0
+
+    home_pieces_diff = count_pieces(b_home_pieces) - home_num
+    away_pieces_diff = count_pieces(b_away_pieces) - away_num
+
+    # Higher differences have more impact on the game
+    home_pieces_diff = home_pieces_diff * home_pieces_diff
+    away_pieces_diff = away_pieces_diff * away_pieces_diff
+
+    if home_pieces_diff == 0 or away_pieces_diff == 0:
+        home_diff_ratio = 0
+        away_diff_ratio = 0
+    else:
+        home_diff_ratio = home_pieces_diff / away_pieces_diff
+        away_diff_ratio = away_pieces_diff / home_pieces_diff
+
+    home_stacks = count_stacks(a_home_pieces)
+    away_stacks = count_stacks(a_away_pieces)
+
+    home_stack_size = average_stack_size(a_home_pieces)
+    away_stack_size = average_stack_size(a_away_pieces)
+
+    home_threat = min_dist_to_boom(game_state, player)
+    away_threat = min_dist_to_boom(game_state, other)
+
+    max_damage = pieces_per_boom(game_state, player)
+    max_losses = pieces_per_boom(game_state, other)
+
+    home_board_score = agent.get_board_score(game_state, player)
+    away_board_score = agent.get_board_score(game_state, other)
+
+    weights = np.array([
+        100,
+        22,
+        -55,
+        -47,
+        180,
+        -180,
+        -11,
+        -35,
+        220,
+        50,
+        -7,
+        -10,
+    ])
+
+    home_features = np.array([
+        home_num,
+        away_num,
+        away_pieces_diff,
+        home_pieces_diff,
+        home_diff_ratio,
+        turn * home_stacks,
+        home_stack_size,
+        turn * home_threat,
+        max_damage,
+        max_losses,
+        home_board_score,
+        away_board_score,
+    ])
+
+    away_features = np.array([
+        away_num,
+        home_num,
+        home_pieces_diff,
+        away_pieces_diff,
+        away_diff_ratio,
+        turn * away_stacks,
+        away_stack_size,
+        turn * away_threat,
+        max_losses,
+        max_damage,
+        away_board_score,
+        home_board_score
+    ])
+
+    home_final = np.dot(home_features, weights)
+    away_final = np.dot(away_features, weights)
+
+    return home_final, away_final
 
 # Counts the number of pieces
 def count_pieces(pieces):
@@ -193,3 +292,6 @@ def closest_piece(game_state, player, xy):
             closest_ally = piece
 
     return closest_ally
+
+
+

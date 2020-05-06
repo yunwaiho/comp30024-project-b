@@ -17,7 +17,7 @@ feature_names = ["home_num",
                  "home_board_score",
                  "away_board_score"]
 
-
+"""
 def main():
 
     original = os.getcwd()
@@ -47,6 +47,12 @@ def main():
             json.dump(reset, file)
 
         iteration += 1
+"""
+
+
+def main():
+    os.chdir("..")
+    os.system("python3 -m referee MCTS MCTS")
 
 
 def initialise_weights(n):

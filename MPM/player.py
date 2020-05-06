@@ -1,6 +1,6 @@
 import json
-import MCTS.search.game as game
-import MCTS.search.agent as agent
+import MPM.search.game as game
+import MPM.search.agent as agent
 
 
 class ExamplePlayer:
@@ -17,17 +17,21 @@ class ExamplePlayer:
         """
         # TODO: Set up state representation.
 
-        with open("MCTS/initial_game_state.json") as file:
+        with open("MPM/initial_game_state.json") as file:
             data = json.load(file)
 
         self.game = game.Game(data)
+        self.game_state = self.game.get_game_state()
         self.colour = colour
-        self.past_states = []
 
-        self.agent = agent.Agent(self.game, colour, self.past_states, trade_prop=0)
+        self.agent = agent.Agent(self.game, self.game_state, colour)
+        self.max_depth = 3
+        self.threshold = 0
 
         self.home_tokens = 12
         self.away_tokens = 12
+
+        self.past_states = []
         self.turn = 0
 
     def action(self):
@@ -41,20 +45,16 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-        game_state = self.game.get_game_state()
-
-        self.past_states.append(game_state[self.colour])
-
-        self.home_tokens = sum([x[0] for x in game_state[self.colour]])
-        self.away_tokens = sum([x[0] for x in game_state[game.other_player(self.colour)]])
-
-        simulations = 7*self.home_tokens
-        search_depth = 3
+        self.past_states.append(self.game_state[self.colour])
+        self.home_tokens = sum([x[0] for x in self.game_state[self.colour]])
+        self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
-            strategy = self.agent.one_enemy_endgame()
+            strategy = self.agent.one_enemy_endgame(self.threshold, self.max_depth)
+        elif self.away_tokens == 2 and self.home_tokens >= 2:
+            strategy = self.agent.two_enemy_endgame(self.threshold, self.max_depth)
         else:
-            strategy = self.agent.monte_carlo(game_state, simulations, search_depth)
+            strategy, val = self.agent.mp_mix(self.threshold, self.max_depth)
 
         n, xy, move, distance = strategy
         if move == "Boom":
@@ -110,22 +110,14 @@ class ExamplePlayer:
             else:
                 self.agent.away_recently_moved = xy2
 
+        self.game_state = self.game.get_game_state()
+
         self.turn += 1
         self.agent.turn = self.turn//2
 
-    def end(self):
+        self.game_state = self.game.get_game_state()
+        self.agent.update_root(self.game_state)
 
-        game_state = self.game.get_game_state()
-        self.agent.update_weights(game_state)
 
-        with open("genetic_programming/score.json") as file:
-            data = json.load(file)
 
-        if game_state[self.colour]:
-            if not game_state[game.other_player(self.colour)]:
-                data[self.colour] += 1
-            else:
-                data["draw"] += 1
 
-        with open("genetic_programming/score.json", 'w') as file:
-            json.dump(data, file)

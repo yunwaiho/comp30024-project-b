@@ -4,8 +4,11 @@ import random
 
 import MCTS.search.game as game
 import MCTS.search.tokens as tokens
+import MCTS.search.features as features
 
 # MCTS taken from pseudocode on geeksforgeeks
+
+
 class Agent:
 
     def __init__(self, game_, player, past_states, trade_prop):
@@ -74,22 +77,22 @@ class Agent:
     def monte_carlo(self, game_state, simulations, depth):
         self.root = self.Node(self, (None, game_state), self.player, None)
         self.root.n = 1
-    #    from datetime import datetime
+        #    from datetime import datetime
 
         for i in range(simulations):
-    #        startTime = datetime.now()
+            #        startTime = datetime.now()
             path = [self.root]
-    #        a = datetime.now() - startTime
-    #        print(i, 1, a)
+            #        a = datetime.now() - startTime
+            #        print(i, 1, a)
             leaf = self.selection(self.root, path)
-    #        b = datetime.now() - startTime - a
-    #        print(i, 2, b)
+            #        b = datetime.now() - startTime - a
+            #        print(i, 2, b)
             simulation_score = self.rollout(game_state, leaf, depth)
-    #        c = datetime.now() - startTime - b
-    #        print(i, 3, c)
+            #        c = datetime.now() - startTime - b
+            #        print(i, 3, c)
             self.backpropagate(leaf, simulation_score)
-    #        d = datetime.now() - startTime - c
-    #        print(i, 4, d)
+        #        d = datetime.now() - startTime - c
+        #        print(i, 4, d)
 
         return self.best_child(self.root)
 
@@ -193,8 +196,8 @@ class Agent:
         best_strategy = None
         best_boom = None
 
-        home_c = count_pieces(game_state[self.player])
-        away_c = count_pieces(game_state[self.other])
+        home_c = features.count_pieces(game_state[self.player])
+        away_c = features.count_pieces(game_state[self.other])
 
         potential_threat = self.has_potential_threat(self.away_recently_moved, self.player)
 
@@ -202,8 +205,8 @@ class Agent:
             temp_game = game.Game(game_state)
             temp_game.boom(self.away_recently_moved, self.other)
             temp_game_state = temp_game.get_game_state()
-            home_t = count_pieces(temp_game_state[self.player])
-            away_t = count_pieces(temp_game_state[self.other])
+            home_t = features.count_pieces(temp_game_state[self.player])
+            away_t = features.count_pieces(temp_game_state[self.other])
             potential_diff = home_t - away_t
             run_aways = []
             if (home_c > away_c and potential_diff > 0) or (home_c <= away_c and potential_diff >= 0):
@@ -223,20 +226,20 @@ class Agent:
             if strategy[2] != "Boom":
                 xy = game.dir_to_xy(xy=strategy[1], direction=strategy[2], distance=strategy[3])
 
-                damage = sqrt(pieces_per_boom(next_state, self.other))
-                if damage == count_stacks(next_state):
+                damage = sqrt(features.pieces_per_boom(next_state, self.other))
+                if damage == features.count_stacks(next_state):
                     continue
 
                 if self.has_potential_threat(xy, self.other):
-                    home_b = count_pieces(next_state[self.player])
-                    away_b = count_pieces(next_state[self.other])
+                    home_b = features.count_pieces(next_state[self.player])
+                    away_b = features.count_pieces(next_state[self.other])
 
                     temp_game = game.Game(next_state)
                     temp_game.boom(xy, self.player)
                     temp_game_state = temp_game.get_game_state()
 
-                    home_a = count_pieces(temp_game_state[self.player])
-                    away_a = count_pieces(temp_game_state[self.other])
+                    home_a = features.count_pieces(temp_game_state[self.player])
+                    away_a = features.count_pieces(temp_game_state[self.other])
 
                     # IS dead
                     if home_a == 0:
@@ -251,8 +254,8 @@ class Agent:
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
 
-                    home_l = count_pieces(temp_game_state[self.player])
-                    away_l = count_pieces(temp_game_state[self.other])
+                    home_l = features.count_pieces(temp_game_state[self.player])
+                    away_l = features.count_pieces(temp_game_state[self.other])
                     loss = home_l - away_l
 
                     # Gains
@@ -260,8 +263,8 @@ class Agent:
                     temp_game1.boom(xy, self.player)
                     temp_game_state = temp_game1.get_game_state()
 
-                    home_g1 = count_pieces(temp_game_state[self.player])
-                    away_g1 = count_pieces(temp_game_state[self.other])
+                    home_g1 = features.count_pieces(temp_game_state[self.player])
+                    away_g1 = features.count_pieces(temp_game_state[self.other])
                     gain1 = home_g1 - away_g1
 
                     gain2 = float("-inf")
@@ -271,8 +274,8 @@ class Agent:
                         temp_game2.boom(strategy[1], self.player)
                         temp_game_state = temp_game2.get_game_state()
 
-                        home_g2 = count_pieces(temp_game_state[self.player])
-                        away_g2 = count_pieces(temp_game_state[self.other])
+                        home_g2 = features.count_pieces(temp_game_state[self.player])
+                        away_g2 = features.count_pieces(temp_game_state[self.other])
                         gain2 = home_g2 - away_g2
 
                     gain = max(gain1, gain2)
@@ -289,8 +292,8 @@ class Agent:
                         trade_game.boom(self.away_recently_moved, self.other)
                         trade_game_state = trade_game.get_game_state()
 
-                        home_o = count_pieces(trade_game_state[self.player])
-                        away_o = count_pieces(trade_game_state[self.other])
+                        home_o = features.count_pieces(trade_game_state[self.player])
+                        away_o = features.count_pieces(trade_game_state[self.other])
                         outcome = home_o - away_o
 
                         run_aways.append((outcome, strategy))
@@ -301,9 +304,12 @@ class Agent:
 
             # If can trade for more
             if strategy[2] == "Boom":
-                home_a = count_pieces(next_state[self.player])
-                away_a = count_pieces(next_state[self.other])
+                home_a = features.count_pieces(next_state[self.player])
+                away_a = features.count_pieces(next_state[self.other])
                 diff = home_a - away_a
+
+                if home_a == 0:
+                    continue
 
                 if (home_c > away_c and diff > 0) or (home_c <= away_c and diff >= 0):
                     if diff > best_boom_diff:
@@ -324,12 +330,12 @@ class Agent:
             if len(run_aways) != 0:
                 run_aways = sorted(run_aways, reverse=True)
                 best_move = run_aways[0][1]
-                best_move_diff = best_move[0]
+                best_move_diff = run_aways[0][0]
 
             # Trade first
             if best_boom_diff > potential_diff and can_boom:
                 if best_move_diff > best_boom_diff:
-                    return best_move[1]
+                    return best_move
                 return best_boom
 
         if can_boom:
@@ -370,6 +376,168 @@ class Agent:
 
         return next_best_node, False
 
+    def one_enemy_endgame(self, game_state, simulations, search_depth, two_enemy=False):
+        # If enemy can draw or we can win
+        for piece in game_state[self.player]:
+            home_b = features.count_pieces(game_state[self.player])
+            temp_game = game.Game(game_state)
+            temp_game.boom((piece[1], piece[2]), self.player)
+            home_a = features.count_pieces(temp_game.get_game_state()[self.player])
+            if not temp_game.get_game_state()[self.player] or (two_enemy and home_b-home_a >= 2):
+                strategy = self.monte_carlo(game_state, simulations, search_depth)
+                return strategy
+            if not temp_game.get_game_state()[self.other]:
+                return None, (piece[1], piece[2]), "Boom", None
+
+        enemy = game_state[self.other][0]
+        enemy_xy = enemy[1], enemy[2]
+
+        ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
+        ally_xy = ally[1], ally[2]
+
+        # Close enough to boom
+        if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
+            return None, ally_xy, "Boom", None
+
+        if two_enemy:
+            enemy = game_state[self.other][1]
+            enemy_xy = enemy[1], enemy[2]
+
+            ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
+            ally_xy = ally[1], ally[2]
+
+            # Close enough to boom
+            if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
+                return None, ally_xy, "Boom", None
+
+        return self.go_there(1, ally, enemy_xy)
+
+    # Doesn't take into account draws
+    def two_enemy_endgame(self, game_state, simulations, search_depth):
+        enemy_stacks = len(game_state[self.other])
+
+        for piece in game_state[self.player]:
+            temp_game = game.Game(game_state)
+            temp_game.boom((piece[1], piece[2]), self.player)
+            if not temp_game.get_game_state()[self.player]:
+                strategy = self.monte_carlo(game_state, simulations, search_depth)
+                return strategy
+            if not temp_game.get_game_state()[self.other]:
+                return None, (piece[1], piece[2]), "Boom", None
+
+        # One stack
+        if enemy_stacks == 1:
+            enemy = game_state[self.other][0]
+            enemy_xy = enemy[1], enemy[2]
+
+            ally = self.closest_npiece(game_state, 2, self.player, enemy_xy)
+            if ally is None:
+                return self.make_stack(game_state)
+
+            ally_xy = ally[1], ally[2]
+            enemy_corner_xy = self.get_nearest_corner(ally_xy, enemy_xy)
+
+            return self.go_there(2, ally, enemy_corner_xy)
+
+        # Two seperate stacks
+        else:
+            return self.one_enemy_endgame(game_state, simulations, search_depth, two_enemy=True)
+
+    @staticmethod
+    def closest_npiece(game_state, n, player, xy):
+        from math import sqrt, pow
+
+        x1, y1 = xy
+        max_dist = float("inf")
+        closest_ally = None
+
+        for piece in game_state[player]:
+            if piece[0] < n:
+                continue
+
+            x2, y2 = piece[1], piece[2]
+
+            dist = sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
+
+            if dist < max_dist:
+                max_dist = dist
+                closest_ally = piece
+
+        return closest_ally
+
+    def get_nearest_corner(self, ally_xy, enemy_xy):
+        from math import sqrt, pow
+
+        closest = None
+        min_dist = float("inf")
+        horizontal = [-1, 1]
+        vertical = [-1, 1]
+
+        for i in horizontal:
+            for j in vertical:
+                ij = enemy_xy[0] + i, enemy_xy[1] + j
+
+                if tokens.out_of_board(ij):
+                    continue
+                dist = sqrt(pow(ally_xy[0] - ij[0], 2) + pow(ally_xy[1] - ij[1], 2))
+
+                if dist < min_dist:
+                    min_dist = dist
+                    closest = ij
+        return closest
+
+    def make_stack(self, game_state):
+
+        min_dist = float("inf")
+        pieces = None
+
+        for piece1 in game_state[self.player]:
+            for piece2 in game_state[self.player]:
+                if piece1 == piece2:
+                    continue
+
+                dist = piece1[1] - piece2[1] + piece1[2] - piece2[2]
+                dist = dist/max(piece1[0], piece2[0])
+
+                if dist < min_dist:
+                    min_dist = dist
+                    pieces = piece1, piece2
+
+        if pieces[0][0] > pieces[1][0]:
+            return self.go_there(pieces[0][0], pieces[0], pieces[1])
+        else:
+            return self.go_there(pieces[1][0], pieces[1], pieces[0])
+
+    def go_there(self, n, piece, get_to):
+        piece_xy = piece[1], piece[2]
+        width = get_to[0] - piece[1]
+        height = get_to[1] - piece[2]
+
+        # Move vertically
+        if abs(height) > abs(width):
+            if piece[0] >= abs(height):
+                if height > 0:
+                    return n, piece_xy, "Up", abs(height)
+                else:
+                    return n, piece_xy, "Down", abs(height)
+            else:
+                if height > 0:
+                    return piece[0], piece_xy, "Up", piece[0]
+                else:
+                    return piece[0], piece_xy, "Down", piece[0]
+        # Move horizontally
+        else:
+            if piece[0] >= abs(width):
+                if width > 0:
+                    return n, piece_xy, "Right", abs(width)
+                else:
+                    return n, piece_xy, "Left", abs(width)
+            else:
+                if width > 0:
+                    return piece[0], piece_xy, "Right", piece[0]
+                else:
+                    return piece[0], piece_xy, "Left", piece[0]
+
     def get_node_utility(self, game_state, player):
         unvisited_children = []
 
@@ -386,102 +554,11 @@ class Agent:
 
     # Can be replaced with another node utility function
     def utility(self, curr_state, next_state, player):
-        return self.evaluation(curr_state, next_state, player, utility=True)
+        return self.evaluation(curr_state, next_state, player)
 
-    # How to define the score of the current game state
-    # Open to change
-    def score(self, curr_state, game_state, player, utility):
+    def evaluation(self, curr_state, game_state, player):
 
-        other = game.other_player(player)
-
-        if utility:
-            if not game_state[player]:
-                return float("-inf"), float("inf")
-            if not game_state[other]:
-                return float("inf"), float("-inf")
-
-        tokens.board_configs()
-
-        b_home_pieces = curr_state[player]
-        b_away_pieces = curr_state[other]
-
-        a_home_pieces = game_state[player]
-        a_away_pieces = game_state[other]
-
-        home_num = count_pieces(a_home_pieces)
-        away_num = count_pieces(a_away_pieces)
-        total_num = home_num + away_num
-
-        if total_num == 0:
-            return 0, 0
-
-        home_pieces_diff = count_pieces(b_home_pieces) - home_num
-        away_pieces_diff = count_pieces(b_away_pieces) - away_num
-
-        # Higher differences have more impact on the game
-        home_pieces_diff = home_pieces_diff * home_pieces_diff
-        away_pieces_diff = away_pieces_diff * away_pieces_diff
-
-        if home_pieces_diff == 0 or away_pieces_diff:
-            home_diff_ratio = 0
-            away_diff_ratio = 0
-        else:
-            home_diff_ratio = home_pieces_diff/away_pieces_diff
-            away_diff_ratio = away_pieces_diff/home_pieces_diff
-
-        home_stacks = count_stacks(a_home_pieces)
-        away_stacks = count_stacks(a_away_pieces)
-
-        home_stack_size = average_stack_size(a_home_pieces)
-        away_stack_size = average_stack_size(a_away_pieces)
-
-        home_threat = min_dist_to_boom(game_state, player)
-        away_threat = min_dist_to_boom(game_state, other)
-
-        max_damage = pieces_per_boom(game_state, player)
-        max_losses = pieces_per_boom(game_state, other)
-
-        home_board_score = self.get_board_score(game_state, player)
-        away_board_score = self.get_board_score(game_state, other)
-
-        home_features = np.array([
-            home_num,
-            away_num,
-            away_pieces_diff,
-            home_pieces_diff,
-            home_diff_ratio,
-            self.turn*home_stacks,
-            home_stack_size,
-            self.turn*home_threat,
-            max_damage,
-            max_losses,
-            home_board_score,
-            away_board_score,
-        ])
-
-        away_features = np.array([
-            away_num,
-            home_num,
-            home_pieces_diff,
-            away_pieces_diff,
-            away_diff_ratio,
-            self.turn*away_stacks,
-            away_stack_size,
-            self.turn*away_threat,
-            max_losses,
-            max_damage,
-            away_board_score,
-            home_board_score
-        ])
-
-        home_final = np.dot(home_features, self.weights)
-        away_final = np.dot(away_features, self.weights)
-
-        return home_final, away_final
-
-    def evaluation(self, curr_state, game_state, player, utility=False):
-
-        home_score, away_score = self.score(curr_state, game_state, self.player, utility)
+        home_score, away_score = features.eval_function(self, curr_state, game_state, self.player, self.turn)
         score = home_score - away_score
 
         if player == self.player:
@@ -511,7 +588,7 @@ class Agent:
         df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
 
         for i in range(len(lst)):
-            df.iloc[self.weight_index, i+1] = lst[i]
+            df.iloc[self.weight_index, i + 1] = lst[i]
 
         df.to_csv("genetic_programming/weights.csv", index=False)
 
@@ -538,7 +615,7 @@ class Agent:
         if total_scores == 0:
             return 0
         else:
-            return other_scores/total_scores
+            return other_scores / total_scores
 
     def count_adjacent(self, player, xy, game_=None):
         if game_ is None:
@@ -581,7 +658,7 @@ class Agent:
         if string_n == 0:
             return 0
         if string_n == 8:
-            return 8*8
+            return 8 * 8
         if string_n > 4:
             string = string.replace("1", "a")
             string = string.replace("0", "1")
@@ -594,10 +671,10 @@ class Agent:
 
         for key, val in config.items():
             n += val
-            if key in 2*string or key in 2*string[::-1]:
+            if key in 2 * string or key in 2 * string[::-1]:
                 value = val
 
-        return string_n*string_n*(1 - value/n)
+        return string_n * string_n * (1 - value / n)
 
     # Finds the 'children' of current game state
     def available_states(self, game_state, player):
@@ -622,16 +699,16 @@ class Agent:
                     all_available.append([(None, xy, move, None), temp_game.get_game_state()])
 
                     # If current number of home pieces <= current number of away pieces
-                    if count_pieces(game_state[player]) < count_pieces(game_state[other]):
-                        home_diff = count_pieces(game_state[player]) - count_pieces(temp_game_state[player])
-                        away_diff = count_pieces(game_state[other]) - count_pieces(temp_game_state[other])
+                    if features.count_pieces(game_state[player]) < features.count_pieces(game_state[other]):
+                        home_diff = features.count_pieces(game_state[player]) - features.count_pieces(temp_game_state[player])
+                        away_diff = features.count_pieces(game_state[other]) - features.count_pieces(temp_game_state[other])
 
                         # Not worth it to trade for less
                         if home_diff >= away_diff:
                             continue
 
                     # If suicide for nothing
-                    if count_pieces(game_state[other]) == count_pieces(temp_game_state[other]):
+                    if features.count_pieces(game_state[other]) == features.count_pieces(temp_game_state[other]):
                         # Don't
                         continue
 
@@ -644,7 +721,7 @@ class Agent:
                     else:
                         amount = min(piece[0], 8)
                         # Move whole stack or leave one or move one
-                        amounts = [1, amount, amount-1]
+                        amounts = [1, amount, amount - 1]
 
                     for n in amounts:
                         for distance in range(piece[0]):
@@ -665,6 +742,36 @@ class Agent:
 
         return available
 
+    def suicide_move(self, game_, player, xy):
+        curr_state = game_.get_game_state()
+        home_b, away_b = features.count_all(curr_state, player)
+
+        # Us booming is the same as someone adj booming on their next turn
+        game_.boom(xy, player)
+        next_state = game_.get_game_state()
+        home_a, away_a = features.count_all(next_state, player)
+
+        if self.is_bad_boom(home_b, home_a, away_b, away_a):
+            return True
+
+        return False
+
+    # Subject to change
+    @staticmethod
+    def is_bad_boom(home_b, home_a, away_b, away_a):
+        diff_b = home_b - away_b
+        diff_a = home_a - away_a
+
+        # If less or equal pieces and the difference between pieces increase
+        if home_b <= away_b and diff_b < diff_a:
+            return True
+        # If more pieces, don't accept a boom that will reduce our lead
+        if home_b > away_b and diff_b <= diff_a:
+            return True
+
+        return False
+
+
     def creates_v(self, game_, xy):
         ally_pieces, all_pieces = self.count_adjacent(self.other, xy, game_=game_)
 
@@ -672,8 +779,8 @@ class Agent:
 
         i = 1
         # Checks for a v, means two bits in a row in bit string
-        while i < len(2*ally_pieces):
-            if (2*ally_pieces)[i] == "1":
+        while i < len(2 * ally_pieces):
+            if (2 * ally_pieces)[i] == "1":
                 if checked:
                     return True
                 else:
@@ -702,269 +809,3 @@ class Agent:
                     return True
 
         return False
-
-    def one_enemy_endgame(self):
-
-        game_state = self.game.get_game_state()
-        enemy = game_state[self.other][0]
-        enemy_xy = enemy[1], enemy[2]
-
-        ally = closest_piece(game_state, self.player, enemy_xy)
-        ally_xy = ally[1], ally[2]
-
-        width = enemy_xy[0] - ally_xy[0]
-        height = enemy_xy[1] - ally_xy[1]
-
-        if abs(width) <= 1 and abs(height) <= 1:
-            return None, ally_xy, "Boom", None
-
-        # Move vertically
-        if abs(height) > abs(width):
-            if ally[0] >= abs(height):
-                if height > 0:
-                    return 1, ally_xy, "Up", abs(height)
-                else:
-                    return 1, ally_xy, "Down", abs(height)
-            else:
-                if height > 0:
-                    return ally[0], ally_xy, "Up", ally[0]
-                else:
-                    return ally[0], ally_xy, "Down", ally[0]
-        # Move horizontally
-        else:
-            if ally[0] >= abs(width):
-                if width > 0:
-                    return 1, ally_xy, "Right", abs(width)
-                else:
-                    return 1, ally_xy, "Left", abs(width)
-            else:
-                if width > 0:
-                    return ally[0], ally_xy, "Right", ally[0]
-                else:
-                    return ally[0], ally_xy, "Left", ally[0]
-    """
-    def two_enemy_endgame(self):
-        game_state = self.game.get_game_state()
-        enemy_stacks = len(game_state[self.other])
-        
-        # One stack
-        if enemy_stacks == 1:
-            enemy = game_state[self.other][0]
-            enemy_xy = enemy[1], enemy[2]
-
-            ally = closest_piece(game_state, self.player, enemy_xy)
-            ally_xy = ally[1], ally[2]
-
-            # Close enough to boom
-            if abs(enemy_xy[1] - ally_xy[1]) <= 1 and abs(enemy_xy[2] - ally_xy[2]) <= 1:
-                return None, ally_xy, "Boom", None
-
-            # Largest piece
-            piece = sorted(game_state[self.player], reverse=True)[0]
-            # No stacks of two or more
-            if piece[0] == 1:
-                pass
-            # There is ally two or more stack
-            else:
-                ally_xy = piece[1], piece[2]
-
-                width = enemy_xy[1] - ally_xy[1]
-                height = enemy_xy[2] - ally_xy[2]
-
-
-
-        # Two seperate stacks
-        else:
-            return self.one_enemy_endgame()
-    """
-
-    def stack_up(self):
-
-        game_state = self.game.get_game_state()
-
-        if self.player == "white":
-            row = 1
-        else:
-            row = 6
-
-        if self.away_recently_moved is None:
-            start = random.choice([0, 7])
-            piece = [1, start, row]
-        else:
-            # 12 Stacks
-            if self.home_recently_moved is None:
-                if self.away_recently_moved[0] < 4:
-                    piece = [1, 0, row]
-                else:
-                    piece = [1, 7, row]
-            # Already Moved
-            else:
-                piece = sorted(game_state[self.player], reverse=True)[0]
-
-        alternate = True
-        i = 1
-        while True:
-            xy = piece[1] + i, piece[2]
-            if tokens.out_of_board(xy) or self.game.board.is_cell_empty(xy):
-                if alternate:
-                    i = -i
-                    alternate = False
-                else:
-                    i = abs(i) + 1
-                    alternate = True
-                continue
-            else:
-                break
-
-        if i > 0:
-            direction = "Right"
-        else:
-            direction = "Left"
-
-        return piece[0], (piece[1], piece[2]), direction, abs(i)
-
-
-
-
-
-
-
-
-
-def closest_wall(xy):
-    x, y = xy
-
-    if x < 4:
-        horizontal = "Left"
-    else:
-        horizontal = "Right"
-    if y < 4:
-        vertical = "Bottom"
-    else:
-        vertical = "Top"
-
-    x_dist = min(x, 7 - x)
-    y_dist = min(y, 7 - y)
-
-    if x_dist < y_dist:
-        return horizontal
-    # Defaults to vertical if equal or less
-    else:
-        return vertical
-
-
-def closest_piece(game_state, player, xy):
-    from math import sqrt, pow
-
-    x1, y1 = xy
-    max_dist = float("inf")
-    closest_ally = None
-
-    for piece in game_state[player]:
-        x2, y2 = piece[1], piece[2]
-
-        dist = sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
-
-        if dist < max_dist:
-            max_dist = dist
-            closest_ally = piece
-
-    return closest_ally
-
-
-# Counts the number of pieces
-def count_pieces(pieces):
-    n = 0
-    for piece in pieces:
-        n += piece[0]
-    return n
-
-
-# Counts the number of stacks
-def count_stacks(pieces):
-    return len(pieces)
-
-
-# Counts the average stack size
-def average_stack_size(pieces):
-
-    if count_pieces(pieces) == 0:
-        return 0
-
-    score = 0
-
-    for piece in pieces:
-        score += piece[0]^2
-
-    return score/count_stacks(pieces)
-
-
-# Finds the minimum moves to move to a boom location
-def min_dist_to_boom(game_state, player):
-    from math import ceil
-
-    if not (game_state[player] and game_state[game.other_player(player)]):
-        return 0
-
-    minimum = float("inf")
-
-    for piece1 in game_state[player]:
-        x1, y1 = piece1[1], piece1[2]
-
-        for piece2 in game_state[game.other_player(player)]:
-            x2, y2 = piece2[1], piece2[2]
-
-            dist = y2 - y1 + x2 - x1
-
-            minimum = min(minimum, ceil(dist/piece1[0]))
-
-    return minimum
-
-
-# Returns the number of spots that are covered by booms
-def boom_area(pieces):
-
-    locs = []
-
-    for piece in pieces:
-        x, y = piece[1], piece[2]
-
-        for i in range(x - 1, x + 1 + 1):
-            for j in range(y - 1, y + 1 + 1):
-                ij = (i, j)
-
-                if tokens.out_of_board(ij):
-                    continue
-
-                if ij not in locs:
-                    locs.append(ij)
-
-    return len(locs)
-
-
-def pieces_per_boom(game_state, player):
-
-    other = game.other_player(player)
-
-    damages = []
-    away_before = len(game_state[other])
-
-    for piece in game_state[player]:
-        temp_game = game.Game(game_state)
-        xy = (piece[1], piece[2])
-
-        temp_game.boom(xy, player)
-        temp_game_state = temp_game.get_game_state()
-
-        away_after = len(temp_game_state[other])
-
-        damage = away_before - away_after
-
-        damages.append(damage)
-
-    if len(damages) == 0:
-        return 0
-
-    return max(damages)*max(damages)
-
-

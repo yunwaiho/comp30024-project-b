@@ -48,49 +48,26 @@ def eval_function(agent, curr_state, game_state, player, turn):
     home_board_score = agent.get_board_score(game_state, player)
     away_board_score = agent.get_board_score(game_state, other)
 
-    weights = np.array([
-        100,
-        -50,
-        100,
-        -50,
-        -200,
-        -35,
-        200,
-        -50,
-        150,
-        -150,
-        -7,
-        -10,
-    ])
+    weights = agent.weights
 
     home_features = np.array([
-        home_num,
-        away_num,
-        home_pieces_diff,
-        away_pieces_diff,
-        turn * home_stacks,
+        home_num - away_num,
+        home_pieces_diff - away_pieces_diff,
+        turn * (home_stacks - away_stacks),
         turn * home_min_dist,
-        max_damage,
-        max_losses,
-        home_threatening,
-        away_threatning,
-        home_board_score,
-        away_board_score
+        max_damage - max_losses,
+        home_threatening - away_threatning,
+        home_board_score - away_board_score
     ])
 
     away_features = np.array([
-        away_num,
-        home_num,
-        away_pieces_diff,
-        home_pieces_diff,
-        turn * away_stacks,
+        away_num - home_num,
+        away_pieces_diff - home_pieces_diff,
+        turn * (away_stacks - home_stacks),
         turn * away_min_dist,
-        max_losses,
-        max_damage,
-        away_threatning,
-        home_threatening,
-        away_board_score,
-        home_board_score
+        max_losses - max_damage,
+        away_threatning - home_threatening,
+        away_board_score - home_board_score
     ])
 
     home_final = np.dot(home_features, weights)
@@ -261,7 +238,7 @@ def pieces_threatened(game_state, player):
                 if tokens.out_of_board(xy2) or not temp_game.board.is_cell_empty(xy2):
                     continue
 
-                temp_game.move_token(1, xy2, move, dist, other)
+                temp_game.move_token(1, xy, move, dist, other)
                 temp_game.boom(xy2, other)
                 home_a = count_pieces(temp_game.get_game_state()[player])
 

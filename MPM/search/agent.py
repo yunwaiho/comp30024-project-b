@@ -1,6 +1,9 @@
 import MPM.search.features as features
 import MPM.search.game as game
 import MPM.search.tokens as tokens
+import random
+import pandas as pd
+import numpy as np
 
 
 class Agent:
@@ -17,7 +20,18 @@ class Agent:
         self.tt = {}
         self.away_recently_moved = None
         self.home_recently_moved = None
+
+        self.past_states = []
         self.root = None
+
+        weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+
+        data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
+
+        self.weight_index = data.iloc[0, 0]
+        self.weight_score = data.iloc[0, 1]
+        self.weight_games = data.iloc[0, 2]
+        self.weights = data.iloc[0, 3:].astype(np.float)
 
     class Node:
 
@@ -48,9 +62,10 @@ class Agent:
         Used when: The home player is losing
         """
         self.game_state = self.game.get_game_state()
+        self.past_states.append(self.game_state[self.player])
 
-        home_score, away_score = self.score(self.game_state, self.game_state)
-        score_diff = home_score - away_score
+        home_eval, away_eval = features.eval_function(self, self.game_state, self.game_state, self.player, self.turn)
+        score_diff = home_eval - away_eval
 
         # Protect our babies
         if score_diff > paranoid_threshold:
@@ -65,7 +80,7 @@ class Agent:
         if self.root is None:
             self.root = self.make_node(self.game_state, self.game_state, self.player, decision)
 
-        for depth in range(1, max_depth):
+        for depth in range(1, max_depth+1):
             strategy = self.strategy(node=self.root, curr_state=self.game_state, depth=depth,
                                      alpha=alpha, beta=beta, player=self.player, decision=decision)
         return strategy
@@ -83,12 +98,9 @@ class Agent:
         # Base Case
         if depth == 0 or game.end(game_state):
 
-            home_eval, away_eval = self.score(curr_state, game_state)
+            evaluation = self.score(curr_state, game_state, decision, player, alpha, beta, extend=True)
 
-            if decision == "p":
-                return None, home_eval
-            else:
-                return None, (home_eval - away_eval)
+            return None, evaluation
 
         if node.children is None:
             node.children = self.get_children(curr_state, game_state, player, decision)
@@ -100,6 +112,9 @@ class Agent:
         if self.player == player:
             for child_node in next_states:
                 strategy, next_state = child_node.previous_move, child_node.game_state
+
+                if next_state[self.player] in self.past_states:
+                    continue
 
                 next_strategy, val = self.strategy(child_node, curr_state, depth-1, alpha, beta, self.other, decision)
 
@@ -147,7 +162,7 @@ class Agent:
         next_states = self.available_states(game_state, player)
 
         for next_strategy, next_state in next_states:
-            state_score = self.utility(curr_state, next_state, strategy)
+            state_score = self.utility(curr_state, next_state, strategy, player)
             children.append((state_score, (next_strategy, next_state)))
 
         ordered_children = self.reorder_nodes(children)
@@ -294,18 +309,49 @@ class Agent:
                 else:
                     return piece[0], piece_xy, "Left", piece[0]
 
-    def score(self, curr_state, game_state):
+    def score(self, curr_state, game_state, decision, player, alpha=None, beta=None, extend=False):
 
         game_state_str = get_str(game_state)
 
         if game_state_str in self.tt:
             home_eval, away_eval = self.tt[game_state_str]
         else:
+            if not game_state[player]:
+                return float("-inf")
+            elif not game_state[game.other_player(player)]:
+                return float("inf")
+
+            # Not a quiet node
+            if extend and features.pieces_threatened(game_state, self.player) > 0:
+                return self.quiesce(curr_state, game_state, alpha, beta, self.player)
+
             home_eval, away_eval = features.eval_function(self, curr_state, game_state, self.player, self.turn)
 
             self.tt[game_state_str] = (home_eval, away_eval)
 
-        return home_eval, away_eval
+        if decision == "p":
+            return home_eval
+        else:
+            return home_eval - away_eval
+
+    def quiesce(self, curr_state, game_state, alpha, beta, player):
+        print(alpha, beta)
+        home_eval, away_eval = features.eval_function(self, curr_state, game_state, self.player, self.turn)
+        stand_pat = (home_eval - away_eval)
+
+        if stand_pat >= beta:
+            return beta
+        if alpha < stand_pat:
+            alpha = stand_pat
+
+        next_moves = self.available_states(game_state, player)
+        for move, next_state in next_moves:
+            score = -self.quiesce(curr_state, next_state, -beta, -alpha, game.other_player(player))
+            if score >= beta:
+                return beta
+            if score > alpha:
+                alpha = score
+        return alpha
 
     def available_states(self, game_state, player, get_all=False):
         available = []
@@ -326,11 +372,10 @@ class Agent:
                         continue
 
                     temp_game.boom(xy, player)
-                    temp_game_state = temp_game.get_game_state()
 
                     all_available.append([(None, xy, move, None), temp_game.get_game_state()])
 
-                    home_a, away_a = features.count_all(temp_game_state, player)
+                    home_a, away_a = features.count_all(temp_game.get_game_state(), player)
 
                     # If suicide for nothing
                     if away_b == away_a:
@@ -380,6 +425,9 @@ class Agent:
                                 if self.creates_v(temp_game, xy2):
                                     continue
 
+                                if temp_game.get_game_state()[self.player] in self.past_states:
+                                    continue
+
                                 available.append([(n, xy, move, distance), temp_game.get_game_state()])
 
         if player != self.player or len(available) == 0 or get_all:
@@ -391,14 +439,11 @@ class Agent:
         return available
 
     # Can be replaced with another node utility function
-    def utility(self, curr_state, next_state, strategy):
+    def utility(self, curr_state, next_state, strategy, player):
 
-        home_eval, away_eval = self.score(curr_state, next_state)
+        utility = self.score(curr_state, next_state, strategy, player)
 
-        if strategy == "p":
-            return home_eval
-        else:
-            return home_eval - away_eval
+        return utility
 
     def count_adjacent(self, player, xy, game_=None):
         if game_ is None:
@@ -474,11 +519,12 @@ class Agent:
 
     def suicide_move(self, game_, player, xy):
         curr_state = game_.get_game_state()
+        temp_game = game.Game(curr_state)
         home_b, away_b = features.count_all(curr_state, player)
 
         # Us booming is the same as someone adj booming on their next turn
-        game_.boom(xy, player)
-        next_state = game_.get_game_state()
+        temp_game.boom(xy, player)
+        next_state = temp_game.get_game_state()
         home_a, away_a = features.count_all(next_state, player)
 
         if self.is_bad_boom(home_b, home_a, away_b, away_a):
@@ -572,6 +618,32 @@ class Agent:
                 value = val
 
         return string_n * string_n * (1 - value / n)
+
+    def update_weights(self, game_state):
+
+        # Win
+        if game_state[self.player] and not game_state[self.other]:
+            if self.player == "black":
+                weight_score = 1
+            else:
+                weight_score = 1
+        # Lose
+        elif game_state[self.other] and not game_state[self.player]:
+            weight_score = 0
+        else:
+            weight_score = 0.25
+
+        total_score = self.weight_score + weight_score
+        games_played = self.weight_games + 1
+
+        lst = [total_score, games_played] + list(self.weights)
+
+        df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+
+        for i in range(len(lst)):
+            df.iloc[self.weight_index, i+1] = lst[i]
+
+        df.to_csv("genetic_programming/weights.csv", index=False)
 
 
 def get_str(game_state):

@@ -21,6 +21,7 @@ class ExamplePlayer:
             data = json.load(file)
 
         self.game = game.Game(data)
+        self.game_state = self.game.get_game_state()
         self.colour = colour
         self.past_states = []
 
@@ -41,20 +42,20 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-        game_state = self.game.get_game_state()
+        self.past_states.append(self.game_state[self.colour])
 
-        self.past_states.append(game_state[self.colour])
+        self.home_tokens = sum([x[0] for x in self.game_state[self.colour]])
+        self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
-        self.home_tokens = sum([x[0] for x in game_state[self.colour]])
-        self.away_tokens = sum([x[0] for x in game_state[game.other_player(self.colour)]])
-
-        simulations = 7*self.home_tokens
+        simulations = 5*self.home_tokens
         search_depth = 3
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
-            strategy = self.agent.one_enemy_endgame()
+            strategy = self.agent.one_enemy_endgame(self.game_state, simulations, search_depth)
+        elif self.away_tokens == 2 and self.home_tokens >= 2:
+            strategy = self.agent.two_enemy_endgame(self.game_state, simulations, search_depth)
         else:
-            strategy = self.agent.monte_carlo(game_state, simulations, search_depth)
+            strategy = self.agent.monte_carlo(self.game_state, simulations, search_depth)
 
         n, xy, move, distance = strategy
         if move == "Boom":
@@ -111,7 +112,10 @@ class ExamplePlayer:
                 self.agent.away_recently_moved = xy2
 
         self.turn += 1
-        self.agent.turn = self.turn//2
+        self.agent.turn = self.turn // 2
+
+        self.game_state = self.game.get_game_state()
+        #self.agent.update_root(self.game_state)
 
     def end(self):
 
@@ -126,6 +130,14 @@ class ExamplePlayer:
                 data[self.colour] += 1
             else:
                 data["draw"] += 1
+        elif game_state[game.other_player(self.colour)]:
+            if not game_state[self.colour]:
+                data[game.other_player(self.colour)] += 1
+            else:
+                data["draw"] += 1
+        else:
+            data["draw"] += 1
+
 
         with open("genetic_programming/score.json", 'w') as file:
             json.dump(data, file)

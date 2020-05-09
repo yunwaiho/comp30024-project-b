@@ -4,32 +4,27 @@ import json
 import random
 import os
 
-feature_names = ["home_num",
-                 "away_num",
-                 "away_pieces_diff",
-                 "home_pieces_diff",
-                 "diff_ratio",
-                 "home_stacks",
-                 "home_stack_size",
-                 "home_threat",
-                 "aggressive",
-                 "defensive",
-                 "home_board_score",
-                 "away_board_score"]
+feature_names = ["home_num - away_num",
+                 "home_pieces_diff - away_pieces_diff",
+                 "turn * (home_stacks - away_stacks)",
+                 "turn * home_min_dist",
+                 "max_damage - max_losses",
+                 "home_threatening - away_threatning",
+                 "home_board_score - away_board_score"]
 
-"""
+
 def main():
-
+    """"""
     original = os.getcwd()
 
-    iteration = 6
+    iteration = 1
 
-    while iteration < 10:
-        survive(200, iteration)
+    while True:
+        survive(150, iteration)
 
         os.chdir(original)
 
-        evolve(iteration, select=0.25, stragglers=0.1, mutate=0.05, variance=0.2)
+        evolve(iteration, select=0.4, stragglers=0.1, mutate=0.05, variance=0.2)
 
         with open("iterations.json") as file:
             scores = json.load(file)
@@ -47,13 +42,6 @@ def main():
             json.dump(reset, file)
 
         iteration += 1
-"""
-
-
-def main():
-    os.chdir("..")
-    os.system("python3 -m referee MCTS MCTS")
-
 
 def initialise_weights(n):
 

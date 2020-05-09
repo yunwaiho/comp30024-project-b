@@ -25,7 +25,7 @@ class ExamplePlayer:
         self.colour = colour
 
         self.agent = agent.Agent(self.game, self.game_state, colour)
-        self.max_depth = 3
+        self.max_depth = 2
         self.threshold = 0
 
         self.home_tokens = 12
@@ -118,6 +118,20 @@ class ExamplePlayer:
         self.game_state = self.game.get_game_state()
         self.agent.update_root(self.game_state)
 
+    def end(self):
 
+        game_state = self.game.get_game_state()
+        self.agent.update_weights(game_state)
 
+        with open("genetic_programming/score.json") as file:
+            data = json.load(file)
 
+        if game_state[self.colour] and not game_state[game.other_player(self.colour)]:
+            data[self.colour] += 1
+        elif not game_state[self.colour] and game_state[game.other_player(self.colour)]:
+            data[game.other_player(self.colour)] += 1
+        else:
+            data["draw"] += 1
+
+        with open("genetic_programming/score.json", 'w') as file:
+            json.dump(data, file)

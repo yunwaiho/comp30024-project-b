@@ -65,6 +65,9 @@ class PlayerWrapper:
         self.log(self.timer.status(), depth=1)
         self.log(self.space.status(), depth=1)
 
+    def end(self):
+        self.player.end()
+
 def _load_player_class(package_name, class_name):
     """
     Load a Player class given the name of a package.

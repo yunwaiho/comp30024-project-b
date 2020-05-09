@@ -24,16 +24,14 @@ class Agent:
         self.past_states = []
         self.root = None
 
-        # weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+        weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
 
-        # data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
+        data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
 
-        data = []
-
-        #self.weight_index = data.iloc[0, 0]
-        #self.weight_score = data.iloc[0, 1]
-        #self.weight_games = data.iloc[0, 2]
-        self.weights = np.array([-4.96,-3.41,2.6221,1.55,2.45,1.49,0.21])
+        self.weight_index = data.iloc[0, 0]
+        self.weight_score = data.iloc[0, 1]
+        self.weight_games = data.iloc[0, 2]
+        self.weights = data.iloc[0, 3:].astype(np.float)
 
     class Node:
 
@@ -83,9 +81,8 @@ class Agent:
         if self.root is None:
             self.root = self.make_node(self.game_state, self.game_state, self.player, decision)
 
-        for depth in range(1, max_depth + 1):
-            strategy = self.strategy(node=self.root, curr_state=self.game_state, depth=depth,
-                                     alpha=alpha, beta=beta, player=self.player, decision=decision)
+        strategy = self.strategy(node=self.root, curr_state=self.game_state, depth=max_depth,
+                                 alpha=alpha, beta=beta, player=self.player, decision=decision)
         return strategy
 
     def strategy(self, node, curr_state, depth, alpha, beta, player, decision):
@@ -622,7 +619,6 @@ class Agent:
 
         return string_n * string_n * (1 - value / n)
 
-    '''
     def update_weights(self, game_state):
 
         # Win
@@ -642,13 +638,12 @@ class Agent:
 
         lst = [total_score, games_played] + list(self.weights)
 
-        #df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+        df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
 
-        #for i in range(len(lst)):
-            #df.iloc[self.weight_index, i+1] = lst[i]
+        for i in range(len(lst)):
+            df.iloc[self.weight_index, i + 1] = lst[i]
 
-        #df.to_csv("genetic_programming/weights.csv", index=False)
-    '''
+        df.to_csv("genetic_programming/weights.csv", index=False)
 
 
 def get_str(game_state):

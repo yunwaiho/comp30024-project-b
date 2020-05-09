@@ -1,5 +1,5 @@
 import numpy as np
-#import pandas as pd
+import pandas as pd
 import random
 
 import MCTS_op.search.game as game
@@ -24,16 +24,15 @@ class Agent:
         self.home_recently_moved = None
         self.root = None
 
-        #weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+        weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
 
-        #data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
+        data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
 
-        #self.weight_index = data.iloc[0, 0]
-        #self.weight_score = data.iloc[0, 1]
-        #self.weight_games = data.iloc[0, 2]
-        #self.weights = data.iloc[0, 3:].astype(np.float)
+        self.weight_index = data.iloc[0, 0]
+        self.weight_score = data.iloc[0, 1]
+        self.weight_games = data.iloc[0, 2]
+        self.weights = data.iloc[0, 3:].astype(np.float)
 
-        self.weights = np.array([-4.96, -3.41, 2.6221, 1.55, 2.45, 1.49, 0.21])
     class Node:
 
         def __init__(self, agent, strategy, player, parent):
@@ -190,7 +189,7 @@ class Agent:
         from math import sqrt
 
         game_state = root.data
-        n_sim = float("-inf")
+        uct_sim = float("-inf")
 
         can_boom = False
         best_boom_diff = float("-inf")
@@ -202,6 +201,8 @@ class Agent:
 
         potential_threat = self.has_potential_threat(self.away_recently_moved, self.player)
 
+        offensive = []
+
         if potential_threat:
             temp_game = game.Game(game_state)
             temp_game.boom(self.away_recently_moved, self.other)
@@ -210,7 +211,8 @@ class Agent:
             away_t = features.count_pieces(temp_game_state[self.other])
             potential_diff = home_t - away_t
             run_aways = []
-            if (home_c > away_c and potential_diff > 0) or (home_c <= away_c and potential_diff >= 0):
+
+            if self.is_bad_boom(home_c, home_t, away_c, away_t):
                 potential_threat = False
 
         for child in root.seen:
@@ -242,12 +244,10 @@ class Agent:
                     home_a = features.count_pieces(temp_game_state[self.player])
                     away_a = features.count_pieces(temp_game_state[self.other])
 
-                    # IS dead
-                    if home_a == 0:
+                    if self.is_bad_boom(home_b, home_a, away_b, away_a):
                         continue
-                    # Running into a trap
-                    if (home_b - home_a) > (away_b - away_a):
-                        continue
+
+                    offensive.append((home_a - away_a, strategy))
 
                 if potential_threat:
                     # Losses
@@ -260,30 +260,13 @@ class Agent:
                     loss = home_l - away_l
 
                     # Gains
-                    temp_game1 = game.Game(next_state)
-                    temp_game1.boom(xy, self.player)
-                    temp_game_state = temp_game1.get_game_state()
+                    temp_game = game.Game(next_state)
+                    temp_game.boom(xy, self.player)
+                    temp_game_state = temp_game.get_game_state()
 
                     home_g1 = features.count_pieces(temp_game_state[self.player])
                     away_g1 = features.count_pieces(temp_game_state[self.other])
-                    gain1 = home_g1 - away_g1
-
-                    gain2 = float("-inf")
-                    # Leave one behind and boom there
-                    if not temp_game1.board.is_cell_empty(strategy[1]):
-                        temp_game2 = game.Game(next_state)
-                        temp_game2.boom(strategy[1], self.player)
-                        temp_game_state = temp_game2.get_game_state()
-
-                        home_g2 = features.count_pieces(temp_game_state[self.player])
-                        away_g2 = features.count_pieces(temp_game_state[self.other])
-                        gain2 = home_g2 - away_g2
-
-                    gain = max(gain1, gain2)
-                    if gain2 > gain1:
-                        temp_game = temp_game2
-                    else:
-                        temp_game = temp_game1
+                    gain = home_g1 - away_g1
 
                     # Same Cluster boomed or Moving to trade is not worth it
                     if gain <= loss:
@@ -320,8 +303,8 @@ class Agent:
                 else:
                     continue
 
-            if child.n > n_sim:
-                n_sim = child.n
+            if child.uct > uct_sim:
+                uct_sim = child.uct
                 best_strategy = strategy
 
         if potential_threat:
@@ -341,6 +324,10 @@ class Agent:
 
         if can_boom:
             return best_boom
+
+        if len(offensive) != 0:
+            offensive = sorted(offensive, reverse=True)
+            return offensive[0][1]
 
         # If nothing is good
         if best_strategy is None:
@@ -377,41 +364,8 @@ class Agent:
 
         return next_best_node, False
 
-    def one_enemy_endgame(self, game_state, simulations, search_depth, two_enemy=False):
-        # If enemy can draw or we can win
-        for piece in game_state[self.player]:
-            home_b = features.count_pieces(game_state[self.player])
-            temp_game = game.Game(game_state)
-            temp_game.boom((piece[1], piece[2]), self.player)
-            home_a = features.count_pieces(temp_game.get_game_state()[self.player])
-            if not temp_game.get_game_state()[self.player] or (two_enemy and home_b-home_a >= 2):
-                strategy = self.monte_carlo(game_state, simulations, search_depth)
-                return strategy
-            if not temp_game.get_game_state()[self.other]:
-                return None, (piece[1], piece[2]), "Boom", None
-
-        enemy = game_state[self.other][0]
-        enemy_xy = enemy[1], enemy[2]
-
-        ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
-        ally_xy = ally[1], ally[2]
-
-        # Close enough to boom
-        if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
-            return None, ally_xy, "Boom", None
-
-        if two_enemy:
-            enemy = game_state[self.other][1]
-            enemy_xy = enemy[1], enemy[2]
-
-            ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
-            ally_xy = ally[1], ally[2]
-
-            # Close enough to boom
-            if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
-                return None, ally_xy, "Boom", None
-
-        return self.go_there(1, ally, enemy_xy)
+    def one_enemy_endgame(self, game_state, simulations, search_depth):
+        return self.trade_tokens(game_state, simulations, search_depth, 1)
 
     # Doesn't take into account draws
     def two_enemy_endgame(self, game_state, simulations, search_depth):
@@ -442,7 +396,58 @@ class Agent:
 
         # Two seperate stacks
         else:
-            return self.one_enemy_endgame(game_state, simulations, search_depth, two_enemy=True)
+            return self.trade_tokens(game_state, simulations, search_depth, 1)
+
+    def trade_tokens(self, game_state, simulations, search_depth, trade_threshold):
+        from math import sqrt, pow
+
+        # If enemy can draw or we can win
+        for piece in game_state[self.player]:
+            temp_game = game.Game(game_state)
+            away_b = features.count_pieces(temp_game.get_game_state()[self.other])
+            temp_game.boom((piece[1], piece[2]), self.player)
+            home_a = features.count_pieces(temp_game.get_game_state()[self.player])
+            away_a = features.count_pieces(temp_game.get_game_state()[self.other])
+
+            if away_b == away_a:
+                continue
+            if not temp_game.get_game_state()[self.player] or (home_a - away_a) < trade_threshold:
+                strategy = self.monte_carlo(game_state, simulations, search_depth)
+                return strategy
+            if not temp_game.get_game_state()[self.other]:
+                return None, (piece[1], piece[2]), "Boom", None
+
+        min_dist = float("inf")
+        closest_ally = None
+        closest_enemy = None
+
+        for enemy in game_state[self.other]:
+            enemy_xy = enemy[1], enemy[2]
+            ally = self.closest_npiece(game_state, 1, self.player, enemy_xy)
+            ally_xy = ally[1], ally[2]
+
+            dist = sqrt(pow(ally_xy[0] - enemy_xy[0], 2) + pow(ally_xy[1] - enemy_xy[1], 2))
+
+            # Close enough to boom
+            if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
+                return None, ally_xy, "Boom", None
+
+            if dist < min_dist:
+                min_dist = dist
+                closest_ally = ally
+                closest_enemy = enemy
+
+        width = closest_ally[1] - closest_enemy[1]
+        height = closest_ally[2] - closest_enemy[2]
+
+        if width == 0 and closest_ally[0] >= height:
+            xy = closest_enemy[1], closest_enemy[2] - np.sign(height)
+        elif height == 0 and closest_ally[0] >= width:
+            xy = closest_enemy[1] - np.sign(width), closest_enemy[2]
+        else:
+            xy = closest_enemy[1], closest_enemy[2]
+
+        return self.go_there(1, closest_ally, xy)
 
     @staticmethod
     def closest_npiece(game_state, n, player, xy):
@@ -566,33 +571,7 @@ class Agent:
             return score
         else:
             return -score
-    '''
-    def update_weights(self, game_state):
 
-        # Win
-        if game_state[self.player] and not game_state[self.other]:
-            if self.player == "black":
-                weight_score = 1
-            else:
-                weight_score = 1
-        # Lose
-        elif game_state[self.other] and not game_state[self.player]:
-            weight_score = 0
-        else:
-            weight_score = 0.25
-
-        total_score = self.weight_score + weight_score
-        games_played = self.weight_games + 1
-
-        lst = [total_score, games_played] + list(self.weights)
-
-        df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
-
-        for i in range(len(lst)):
-            df.iloc[self.weight_index, i + 1] = lst[i]
-
-        df.to_csv("genetic_programming/weights.csv", index=False)
-    '''
     def get_board_score(self, game_state, player):
 
         other_scores = 0
@@ -722,7 +701,7 @@ class Agent:
                     else:
                         amount = min(piece[0], 8)
                         # Move whole stack or leave one or move one
-                        amounts = [1, amount, amount - 1]
+                        amounts = [1, amount]
 
                     for n in amounts:
                         for distance in range(piece[0]):
@@ -731,6 +710,9 @@ class Agent:
                             if temp_game.is_valid_move(xy, move, distance, player):
                                 temp_game.move_token(n, xy, move, distance, player)
                                 xy2 = game.dir_to_xy(xy, move, distance)
+
+                                if n == 1 and not self.has_potential_threat(xy2, self.other):
+                                    continue
 
                                 # We don't like a v pattern (inefficient move)
                                 if self.creates_v(temp_game, xy2):
@@ -764,14 +746,15 @@ class Agent:
         diff_a = home_a - away_a
 
         # If less or equal pieces and the difference between pieces increase
-        if home_b <= away_b and diff_b < diff_a:
+        if home_b <= away_b and diff_b > diff_a:
             return True
         # If more pieces, don't accept a boom that will reduce our lead
-        if home_b > away_b and diff_b <= diff_a:
+        if home_b > away_b and diff_b >= diff_a:
+            return True
+        if home_a == 0:
             return True
 
         return False
-
 
     def creates_v(self, game_, xy):
         ally_pieces, all_pieces = self.count_adjacent(self.other, xy, game_=game_)
@@ -810,3 +793,29 @@ class Agent:
                     return True
 
         return False
+
+    def update_weights(self, game_state):
+
+        # Win
+        if game_state[self.player] and not game_state[self.other]:
+            if self.player == "black":
+                weight_score = 1
+            else:
+                weight_score = 1
+        # Lose
+        elif game_state[self.other] and not game_state[self.player]:
+            weight_score = 0
+        else:
+            weight_score = 0.25
+
+        total_score = self.weight_score + weight_score
+        games_played = self.weight_games + 1
+
+        lst = [total_score, games_played] + list(self.weights)
+
+        df = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+
+        for i in range(len(lst)):
+            df.iloc[self.weight_index, i + 1] = lst[i]
+
+        df.to_csv("genetic_programming/weights.csv", index=False)

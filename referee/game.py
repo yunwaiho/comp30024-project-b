@@ -103,6 +103,9 @@ def play(players,
         # Next player's turn!
         curr_player, next_player = next_player, curr_player
 
+    curr_player.end()
+    next_player.end()
+
     # After that loop, the game has ended (one way or another!)
     return game.end()
 

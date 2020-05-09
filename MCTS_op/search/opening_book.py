@@ -55,10 +55,12 @@ class OpenBook:
             n = move[1]
             xy1 = move[2]
             xy2 = move[3]
-            piece = self.game.board.get_token(xy1)
-            if tokens.is_valid_move(self.game.board, xy1, xy2):
-                if piece[0] == self.player and piece[1] >= n:
-                    return True
+
+            if not self.game.board.is_cell_empty(xy1):
+                piece = self.game.board.get_token(xy1)
+                if tokens.is_valid_move(self.game.board, xy1, xy2):
+                    if piece[0] == self.player and piece[1] >= n:
+                        return True
         return False
 
     def update_early_game(self, colour, action):

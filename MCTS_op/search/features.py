@@ -54,21 +54,21 @@ def eval_function(agent, curr_state, game_state, player, turn):
     home_features = np.array([
         home_num - away_num,
         home_pieces_diff - away_pieces_diff,
-        turn * (home_stacks - away_stacks),
-        turn * home_min_dist,
-        max_damage - max_losses,
-        home_threatening - away_threatning,
-        home_board_score - away_board_score
+        home_stacks,
+        home_min_dist,
+        max_damage,
+        home_threatening,
+        home_board_score
     ])
 
     away_features = np.array([
         away_num - home_num,
         away_pieces_diff - home_pieces_diff,
-        turn * (away_stacks - home_stacks),
-        turn * away_min_dist,
-        max_losses - max_damage,
-        away_threatning - home_threatening,
-        away_board_score - home_board_score
+        away_stacks,
+        away_min_dist,
+        max_losses,
+        away_threatning,
+        away_board_score
     ])
 
     home_final = np.dot(home_features, weights)
@@ -157,7 +157,7 @@ def pieces_per_boom(game_state, player):
     other = game.other_player(player)
 
     damages = []
-    away_before = len(game_state[other])
+    away_before = count_pieces(game_state[other])
 
     for piece in game_state[player]:
         temp_game = game.Game(game_state)
@@ -166,7 +166,7 @@ def pieces_per_boom(game_state, player):
         temp_game.boom(xy, player)
         temp_game_state = temp_game.get_game_state()
 
-        away_after = len(temp_game_state[other])
+        away_after = count_pieces(temp_game_state[other])
 
         damage = away_before - away_after
 

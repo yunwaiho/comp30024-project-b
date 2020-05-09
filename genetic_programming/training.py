@@ -6,11 +6,11 @@ import os
 
 feature_names = ["home_num - away_num",
                  "home_pieces_diff - away_pieces_diff",
-                 "turn * (home_stacks - away_stacks)",
+                 "home_stacks",
                  "turn * home_min_dist",
-                 "max_damage - max_losses",
-                 "home_threatening - away_threatning",
-                 "home_board_score - away_board_score"]
+                 "max_damage",
+                 "home_threatening",
+                 "home_board_score"]
 
 
 def main():
@@ -20,11 +20,11 @@ def main():
     iteration = 1
 
     while True:
-        survive(150, iteration)
+        survive(100, iteration)
 
         os.chdir(original)
 
-        evolve(iteration, select=0.4, stragglers=0.1, mutate=0.05, variance=0.2)
+        evolve(iteration, select=0.4, stragglers=0.1, mutate=0.05, variance=0.5)
 
         with open("iterations.json") as file:
             scores = json.load(file)
@@ -43,6 +43,7 @@ def main():
 
         iteration += 1
 
+
 def initialise_weights(n):
 
     df = pd.DataFrame(columns=feature_names)
@@ -50,7 +51,7 @@ def initialise_weights(n):
     for i in range(n):
         weights = {}
         for j in range(len(feature_names)):
-            weights[feature_names[j]] = random.uniform(-10, 10)
+            weights[feature_names[j]] = random.uniform(-100, 100)
 
         df = df.append(weights, ignore_index=True)
 
@@ -135,7 +136,7 @@ def evolve(iteration, select, stragglers, mutate, variance):
 
 
 def simulate_games():
-    os.system("python3 -m referee MCTS MCTS")
+    os.system("python3 -m referee -t 60 MCTS_op MCTS_op")
 
 
 def survive(n, iteration):

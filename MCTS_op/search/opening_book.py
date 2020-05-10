@@ -1,4 +1,4 @@
-#Module for opening moves
+# Module for opening moves
 
 import numpy as np
 
@@ -7,10 +7,8 @@ import MCTS_op.search.tokens as tokens
 
 
 class OpenBook:
-    other_player_move = None
-    is_early_game = True
 
-    #Constructor
+    # Constructor
     def __init__(self, game_, colour):
 
         self.player = colour
@@ -18,6 +16,9 @@ class OpenBook:
 
         self.early_game_turn = 0
         self.game = game_
+
+        self.other_player_move = None
+        self.is_early_game = True
 
         if colour == "black":
             self.book = black_opening_book()
@@ -27,7 +28,8 @@ class OpenBook:
 
         self.boom_book = get_boom_book()
 
-    #Decides the next move
+    # Decides the next move
+    @property
     def next_move(self):
         dict_move = self.early_game_turn + 1
         boom_diff = []
@@ -38,12 +40,12 @@ class OpenBook:
             if self.player == "white" and self.early_game_turn == 0:
                 return self.book[dict_move][0]
 
-            avail_moves = self.book[dict_move][OpenBook.other_player_move]
-            boom_check_move = self.boom_book[self.player][OpenBook.other_player_move]
+            avail_moves = self.book[dict_move][self.other_player_move]
+            boom_check_move = self.boom_book[self.player][self.other_player_move]
 
-            print("dict_move:", dict_move, avail_moves)
+            print("dict_move:", dict_move, avail_moves, self.other_player_move)
             if avail_moves is None:
-                OpenBook.is_early_game = False
+                self.is_early_game = False
                 return None
 
             for move in avail_moves:
@@ -60,10 +62,10 @@ class OpenBook:
                 index = np.argmax(boom_diff_np)
                 return boom_move[index]
 
-        OpenBook.is_early_game = False
+        self.is_early_game = False
         return None
 
-    #Checks for a valid move
+    # Checks for a valid move
     def is_comp_valid_move(self, move):
 
         action_type = move[0]
@@ -91,9 +93,9 @@ class OpenBook:
             self.early_game_turn += 1
         else:
             if self.early_game_turn == 1 and self.player == "white" or self.early_game_turn == 0 and self.player == "black":
-                OpenBook.other_player_move = OpenBook.other_player_move_side(action)
+                self.other_player_move = self.other_player_move_side(action)
 
-    #Checks which side of the board did the player move
+    # Checks which side of the board did the player move
     @staticmethod
     def other_player_move_side(action):
         action_type = action[0]
@@ -129,7 +131,7 @@ class OpenBook:
             if x1 > 5:
                 return "R"
 
-    #Checks if the move results in a good boom
+    # Checks if the move results in a good boom
     def good_boom_check(self, move):
         move_type = move[0]
 
@@ -167,12 +169,12 @@ class OpenBook:
                             away_boom.append(ij)
                             self.count_boom(ij, visited, home_boom, away_boom)
 
+    def check_early_game(self):
+        return self.is_early_game
 
-def check_early_game():
-    return OpenBook.is_early_game
 
 #######################################################################################
-#Dictionaries for opening moves
+# Dictionaries for opening moves
 def get_boom_book():
     book = {
         "white":
@@ -184,10 +186,10 @@ def get_boom_book():
             },
         "black":
             {
-                "L": [5,6],
+                "L": [5, 6],
                 "CR": [5],
                 "CL": [5],
-                "R": [5,6]
+                "R": [5, 6]
             }
     }
     return book
@@ -264,16 +266,16 @@ def black_opening_book():
             "R": [("MOVE", 1, (1, 6), (1, 2))]
         },
         5: {
-            "L": [("MOVE", 1, (6, 2), (6, 1)),("BOOM", (6, 2)), ("MOVE", 1, (6, 2), (5, 2))],
+            "L": [("MOVE", 1, (6, 2), (6, 1)), ("BOOM", (6, 2)), ("MOVE", 1, (6, 2), (5, 2))],
             "CL": [("BOOM", (5, 2)), ("MOVE", 1, (5, 2), (5, 1))],
             "CR": [("BOOM", (2, 2)), ("MOVE", 1, (2, 2), (2, 1))],
-            "R": [("MOVE", 1, (1, 2), (1, 1)),("BOOM", (1, 2)), ("MOVE", 1, (1, 2), (2, 2))]
+            "R": [("MOVE", 1, (1, 2), (1, 1)), ("BOOM", (1, 2)), ("MOVE", 1, (1, 2), (2, 2))]
         },
         6: {
-            "L": [("BOOM", (6,1)), ("MOVE", 1, (6,1),(5,1)), ("BOOM", (5, 2)), ("MOVE", 1, (5, 2), (5, 1))],
+            "L": [("BOOM", (6, 1)), ("MOVE", 1, (6, 1), (5, 1)), ("BOOM", (5, 2)), ("MOVE", 1, (5, 2), (5, 1))],
             "CL": [("BOOM", (5, 1))],
             "CR": [("BOOM", (2, 1))],
-            "R": [("BOOM", (1,1)), ("MOVE", 1, (1,1),(2,1)), ("BOOM", (2, 2)), ("MOVE", 1, (2, 2), (2, 1))]
+            "R": [("BOOM", (1, 1)), ("MOVE", 1, (1, 1), (2, 1)), ("BOOM", (2, 2)), ("MOVE", 1, (2, 2), (2, 1))]
         },
         7: {
             "L": [("BOOM", (5, 1))],

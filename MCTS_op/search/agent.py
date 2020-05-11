@@ -142,33 +142,7 @@ class Agent:
 
         # Assume opponent is random
         if player != self.player:
-            available_moves = tokens.available_moves(player)
-            pieces = game_state[player]
-
-            strategy = None
-            has_valid_move = False
-
-            while not has_valid_move:
-                move = random.choice(available_moves)
-                piece = random.choice(pieces)
-                xy = piece[1], piece[2]
-
-                if move == "Boom":
-                    has_valid_move = True
-
-                    temp_game.boom(xy, player)
-                    strategy = [(None, xy, move, None), temp_game.get_game_state()]
-
-                else:
-                    distance = random.randint(1, piece[0])
-                    amount = random.randint(1, piece[0])
-
-                    if temp_game.is_valid_move(xy, move, distance, player):
-                        has_valid_move = True
-
-                        temp_game.move_token(amount, xy, move, distance, player)
-                        strategy = [(amount, xy, move, distance), temp_game.get_game_state()]
-
+            strategy = self.random_valid_move(game_state, player)
             temp_node = self.Node(self, strategy, game.other_player(player), None)
 
         # Stick to the plan
@@ -364,9 +338,7 @@ class Agent:
 
         # If nothing is good
         if best_strategy is None:
-            # We lose anyways
-            moves = self.available_states(game_state, self.player)
-            return random.choice(moves)[0]
+            return self.random_valid_move(game_state, self.player)
 
         return best_strategy
 
@@ -400,17 +372,19 @@ class Agent:
         return self.trade_tokens(game_state, simulations, search_depth, 1)
 
     # Doesn't take into account draws
-    def two_enemy_endgame(self, game_state, simulations, search_depth):
+    def two_enemy_endgame(self, game_state, simulations, search_depth, trade_threshold):
         enemy_stacks = len(game_state[self.other])
 
-        for piece in game_state[self.player]:
+        # Check if enemy can kill us or draw
+        for piece in game_state[self.other]:
             temp_game = game.Game(game_state)
-            temp_game.boom((piece[1], piece[2]), self.player)
-            if not temp_game.get_game_state()[self.player]:
+            temp_game.boom((piece[1], piece[2]), self.other)
+            home_a = features.count_pieces(temp_game.get_game_state()[self.player])
+            away_a = features.count_pieces(temp_game.get_game_state()[self.other])
+
+            if not temp_game.get_game_state()[self.player] or home_a - away_a < trade_threshold:
                 strategy = self.monte_carlo(game_state, simulations, search_depth)
                 return strategy
-            if not temp_game.get_game_state()[self.other]:
-                return None, (piece[1], piece[2]), "Boom", None
 
         # One stack
         if enemy_stacks == 1:
@@ -422,32 +396,36 @@ class Agent:
                 return self.make_stack(game_state)
 
             ally_xy = ally[1], ally[2]
-            enemy_corner_xy = self.get_nearest_corner(ally_xy, enemy_xy)
 
-            return self.go_there(2, ally, enemy_corner_xy)
+            # Close enough to boom
+            if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
+                return None, ally_xy, "Boom", None
+
+            enemy_corner_xy = self.get_nearest_corner(ally_xy, enemy_xy)
+            move = self.go_there(2, ally, enemy_corner_xy)
+
+            if tokens.is_valid_move(self.game.board, move[1], game.dir_to_xy(move[1], move[2], move[3])):
+                return move
+            else:
+                return self.monte_carlo(game_state, simulations, search_depth)
 
         # Two seperate stacks
         else:
-            return self.trade_tokens(game_state, simulations, search_depth, 1)
+            return self.trade_tokens(game_state, simulations, search_depth, trade_threshold)
 
     def trade_tokens(self, game_state, simulations, search_depth, trade_threshold):
         from math import sqrt, pow
 
-        # If enemy can draw or we can win
-        for piece in game_state[self.player]:
+        # Check if enemy can kill us or draw
+        for piece in game_state[self.other]:
             temp_game = game.Game(game_state)
-            away_b = features.count_pieces(temp_game.get_game_state()[self.other])
-            temp_game.boom((piece[1], piece[2]), self.player)
+            temp_game.boom((piece[1], piece[2]), self.other)
             home_a = features.count_pieces(temp_game.get_game_state()[self.player])
             away_a = features.count_pieces(temp_game.get_game_state()[self.other])
 
-            if away_b == away_a:
-                continue
-            if not temp_game.get_game_state()[self.player] or home_a < trade_threshold:
+            if not temp_game.get_game_state()[self.player] or home_a - away_a < trade_threshold:
                 strategy = self.monte_carlo(game_state, simulations, search_depth)
                 return strategy
-            if not temp_game.get_game_state()[self.other]:
-                return None, (piece[1], piece[2]), "Boom", None
 
         min_dist = float("inf")
         closest_ally = None
@@ -763,6 +741,39 @@ class Agent:
             return all_available
 
         return available
+
+    @staticmethod
+    def random_valid_move(game_state, player):
+
+        temp_game = game.Game(game_state)
+        available_moves = tokens.available_moves(player)
+        pieces = game_state[player]
+
+        strategy = None
+        has_valid_move = False
+
+        while not has_valid_move:
+            move = random.choice(available_moves)
+            piece = random.choice(pieces)
+            xy = piece[1], piece[2]
+
+            if move == "Boom":
+                has_valid_move = True
+
+                temp_game.boom(xy, player)
+                strategy = [(None, xy, move, None), temp_game.get_game_state()]
+
+            else:
+                distance = random.randint(1, piece[0])
+                amount = random.randint(1, piece[0])
+
+                if temp_game.is_valid_move(xy, move, distance, player):
+                    has_valid_move = True
+
+                    temp_game.move_token(amount, xy, move, distance, player)
+                    strategy = [(amount, xy, move, distance), temp_game.get_game_state()]
+
+        return strategy
 
     # New
     """

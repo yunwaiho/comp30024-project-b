@@ -17,7 +17,7 @@ def main():
     """"""
     original = os.getcwd()
 
-    iteration = 1
+    iteration = 19
 
     while True:
         survive(100, iteration)
@@ -136,7 +136,7 @@ def evolve(iteration, select, stragglers, mutate, variance):
 
 
 def simulate_games():
-    os.system("python3 -m referee -t 60 MCTS_op MCTS_op")
+    os.system("python3 -m referee MCTS_op MCTS_op")
 
 
 def survive(n, iteration):

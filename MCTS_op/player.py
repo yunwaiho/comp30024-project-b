@@ -63,11 +63,11 @@ class ExamplePlayer:
         ########################################
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
-            strategy = self.agent.one_enemy_endgame(self.game_state, simulations, search_depth)
+            strategy = self.agent.one_enemy_endgame(self.game_state, simulations, search_depth, 1)
         elif self.away_tokens == 2 and self.home_tokens >= 2:
-            strategy = self.agent.two_enemy_endgame(self.game_state, simulations, search_depth)
+            strategy = self.agent.two_enemy_endgame(self.game_state, simulations, search_depth, 1)
         elif self.away_tokens <= self.trading_prop and self.away_tokens < self.home_tokens:
-            strategy = self.agent.trade_tokens(self.game_state, simulations, search_depth, self.away_tokens+1)
+            strategy = self.agent.trade_tokens(self.game_state, simulations, search_depth, 1)
         else:
             strategy = self.agent.monte_carlo(self.game_state, simulations, search_depth)
 

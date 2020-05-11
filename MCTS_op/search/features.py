@@ -2,13 +2,11 @@
 # Module for the evalation function and the features used
 
 import MCTS_op.search.tokens as tokens
-import MCTS_op.search.board as board
 import MCTS_op.search.game as game
-
 import numpy as np
 
 
-def eval_function(agent, curr_state, game_state, player, turn):
+def eval_function(agent, curr_state, game_state, player):
     other = game.other_player(player)
 
     b_home_pieces = curr_state[player]
@@ -76,10 +74,7 @@ def eval_function(agent, curr_state, game_state, player, turn):
 
 # Counts the number of pieces
 def count_pieces(pieces):
-    n = 0
-    for piece in pieces:
-        n += piece[0]
-    return n
+    return sum([piece[0] for piece in pieces])
 
 
 # Counts the number of stacks
@@ -88,33 +83,12 @@ def count_stacks(pieces):
 
 
 def count_stack_score(pieces):
-    score = 0
-
-    for piece in pieces:
-        score += piece[0] * piece[0]
-
-    return score
+    return sum([piece[0]**2 for piece in pieces])
 
 
 # Counts the number of pieces for both players
 def count_all(game_state, player):
-    home = sum([x[0] for x in game_state[player]])
-    away = sum([x[0] for x in game_state[game.other_player(player)]])
-
-    return home, away
-
-
-# Counts the average stack size
-def average_stack_size(pieces):
-    if count_pieces(pieces) == 0:
-        return 0
-
-    score = 0
-
-    for piece in pieces:
-        score += piece[0] ^ 2
-
-    return score / count_stacks(pieces)
+    return count_pieces(game_state[player]), count_pieces(game_state[game.other_player(player)])
 
 
 # Finds the minimum moves to move to a boom location
@@ -137,26 +111,6 @@ def min_dist_to_boom(game_state, player):
             minimum = min(minimum, ceil(dist / piece1[0]))
 
     return minimum
-
-
-# Returns the number of spots that are covered by booms
-def boom_area(pieces):
-    locs = []
-
-    for piece in pieces:
-        x, y = piece[1], piece[2]
-
-        for i in range(x - 1, x + 1 + 1):
-            for j in range(y - 1, y + 1 + 1):
-                ij = (i, j)
-
-                if tokens.out_of_board(ij):
-                    continue
-
-                if ij not in locs:
-                    locs.append(ij)
-
-    return len(locs)
 
 
 def pieces_per_boom(game_state, player):
@@ -182,47 +136,6 @@ def pieces_per_boom(game_state, player):
         return 0
 
     return max(damages) * max(damages)
-
-
-def closest_wall(xy):
-    x, y = xy
-
-    if x < 4:
-        horizontal = "Left"
-    else:
-        horizontal = "Right"
-    if y < 4:
-        vertical = "Bottom"
-    else:
-        vertical = "Top"
-
-    x_dist = min(x, 7 - x)
-    y_dist = min(y, 7 - y)
-
-    if x_dist < y_dist:
-        return horizontal
-    # Defaults to vertical if equal or less
-    else:
-        return vertical
-
-
-def closest_piece(game_state, player, xy):
-    from math import sqrt, pow
-
-    x1, y1 = xy
-    max_dist = float("inf")
-    closest_ally = None
-
-    for piece in game_state[player]:
-        x2, y2 = piece[1], piece[2]
-
-        dist = sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
-
-        if dist < max_dist:
-            max_dist = dist
-            closest_ally = piece
-
-    return closest_ally
 
 
 def pieces_threatened(game_state, player):

@@ -17,7 +17,7 @@ def main():
     """"""
     original = os.getcwd()
 
-    iteration = 19
+    iteration = 20
 
     while True:
         survive(100, iteration)

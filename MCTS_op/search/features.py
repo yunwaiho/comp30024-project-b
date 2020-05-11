@@ -31,11 +31,8 @@ def eval_function(agent, curr_state, game_state, player, turn):
     home_pieces_diff = home_pieces_diff * home_pieces_diff
     away_pieces_diff = away_pieces_diff * away_pieces_diff
 
-    home_stacks = count_stacks(a_home_pieces)
-    away_stacks = count_stacks(a_away_pieces)
-
-    home_stacks = home_stacks * home_stacks
-    away_stacks = away_stacks * away_stacks
+    home_stacks = count_stack_score(a_home_pieces)
+    away_stacks = count_stack_score(a_away_pieces)
 
     home_min_dist = min_dist_to_boom(game_state, player)
     away_min_dist = min_dist_to_boom(game_state, other)
@@ -88,6 +85,15 @@ def count_pieces(pieces):
 # Counts the number of stacks
 def count_stacks(pieces):
     return len(pieces)
+
+
+def count_stack_score(pieces):
+    score = 0
+
+    for piece in pieces:
+        score += piece[0] * piece[0]
+
+    return score
 
 
 # Counts the number of pieces for both players

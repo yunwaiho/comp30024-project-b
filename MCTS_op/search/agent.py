@@ -212,12 +212,21 @@ class Agent:
             potential_diff = home_t - away_t
             run_aways = []
 
-            if self.is_bad_boom(home_c, home_t, away_c, away_t):
+            # If is bad boom for the other player
+            if self.is_bad_boom(away_c, away_t, home_c, home_t):
                 potential_threat = False
+
+            print(potential_threat, potential_diff)
+
+        potential_moves = []
+        all_strategies = []
+        all_moves = []
 
         for child in root.seen:
             strategy = child.move
             next_state = child.data
+
+            all_moves.append(strategy)
 
             if next_state[self.player] in self.past_states:
                 continue
@@ -230,10 +239,10 @@ class Agent:
                 xy = game.dir_to_xy(xy=strategy[1], direction=strategy[2], distance=strategy[3])
 
                 damage = sqrt(features.pieces_per_boom(next_state, self.other))
-                if damage == features.count_stacks(next_state):
+                if damage == features.count_pieces(next_state[self.player]):
                     continue
 
-                if self.has_potential_threat(xy, self.other):
+                if not potential_threat and self.has_potential_threat(xy, self.other):
                     home_b = features.count_pieces(next_state[self.player])
                     away_b = features.count_pieces(next_state[self.other])
 
@@ -250,7 +259,10 @@ class Agent:
                     offensive.append((home_a - away_a, strategy))
 
                 if potential_threat:
-                    # Losses
+
+                    potential_moves.append(strategy)
+
+                    # Losses from moving
                     temp_game = game.Game(next_state)
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
@@ -259,55 +271,71 @@ class Agent:
                     away_l = features.count_pieces(temp_game_state[self.other])
                     loss = home_l - away_l
 
-                    # Gains
-                    temp_game = game.Game(next_state)
-                    temp_game.boom(xy, self.player)
-                    temp_game_state = temp_game.get_game_state()
+                    if self.has_potential_threat(xy, self.other):
+                        # Potential gains from moving
+                        temp_game = game.Game(next_state)
+                        temp_game.boom(xy, self.player)
+                        temp_game_state = temp_game.get_game_state()
 
-                    home_g1 = features.count_pieces(temp_game_state[self.player])
-                    away_g1 = features.count_pieces(temp_game_state[self.other])
-                    gain = home_g1 - away_g1
+                        home_g1 = features.count_pieces(temp_game_state[self.player])
+                        away_g1 = features.count_pieces(temp_game_state[self.other])
+                        gain = home_g1 - away_g1
 
-                    # Same Cluster boomed or Moving to trade is not worth it
-                    if gain <= loss:
-                        continue
+                        # Same Cluster boomed or Moving to trade is not worth it
+                        if gain > loss:
+                            trade_game = temp_game
+                            trade_game.boom(self.away_recently_moved, self.other)
+                            trade_game_state = trade_game.get_game_state()
+
+                            home_o = features.count_pieces(trade_game_state[self.player])
+                            away_o = features.count_pieces(trade_game_state[self.other])
+                            outcome = home_o - away_o
+
+                            # Minimise Losses by trading
+                            run_aways.append((outcome, strategy))
+
                     else:
-                        trade_game = temp_game
-                        trade_game.boom(self.away_recently_moved, self.other)
-                        trade_game_state = trade_game.get_game_state()
-
-                        home_o = features.count_pieces(trade_game_state[self.player])
-                        away_o = features.count_pieces(trade_game_state[self.other])
-                        outcome = home_o - away_o
-
-                        run_aways.append((outcome, strategy))
-
-                    # Minimise Losses
-                    if loss > potential_diff:
-                        run_aways.append((loss, strategy))
+                        # Minimise Losses by Running
+                        if loss > potential_diff:
+                            run_aways.append((loss, strategy))
 
             # If can trade for more
             if strategy[2] == "Boom":
-                home_a = features.count_pieces(next_state[self.player])
-                away_a = features.count_pieces(next_state[self.other])
+
+                temp_game = game.Game(next_state)
+                if potential_threat and not temp_game.board.is_cell_empty(self.away_recently_moved):
+                    temp_game.boom(self.away_recently_moved, self.other)
+                    temp_game_state = temp_game.get_game_state()
+                    home_a = features.count_pieces(temp_game_state[self.player])
+                    away_a = features.count_pieces(temp_game_state[self.other])
+                else:
+                    home_a = features.count_pieces(next_state[self.player])
+                    away_a = features.count_pieces(next_state[self.other])
+
+                    if self.is_bad_boom(home_c, home_a, away_c, away_a):
+                        continue
+
                 diff = home_a - away_a
 
-                if home_a == 0:
-                    continue
-
-                if (home_c > away_c and diff > 0) or (home_c <= away_c and diff >= 0):
-                    if diff > best_boom_diff:
-                        best_boom_diff = diff
-                        best_boom = strategy
-                        can_boom = True
-                else:
-                    continue
+                if ((home_c < away_c and diff >= 0) or (home_c >= away_c and diff > 0)) and diff > best_boom_diff:
+                    best_boom_diff = diff
+                    best_boom = strategy
+                    can_boom = True
 
             if child.uct > uct_sim:
                 uct_sim = child.uct
                 best_strategy = strategy
 
+            all_strategies.append(strategy)
+
         if potential_threat:
+            print(run_aways)
+            print("new")
+            print("all", all_moves)
+            print("parsed", all_strategies)
+            print("potential", potential_moves)
+
+            best_move = None
             best_move_diff = float("-inf")
 
             # Run away
@@ -316,11 +344,16 @@ class Agent:
                 best_move = run_aways[0][1]
                 best_move_diff = run_aways[0][0]
 
-            # Trade first
-            if best_boom_diff > potential_diff and can_boom:
-                if best_move_diff > best_boom_diff:
+            if best_boom_diff > best_move_diff:
+                # Trade first
+                if best_boom_diff > potential_diff and can_boom:
+                    print("BOOM")
+                    return best_boom
+            else:
+                # Run away or Run away to Trade
+                if best_move is not None and best_move_diff > potential_diff:
+                    print("MOVE")
                     return best_move
-                return best_boom
 
         if can_boom:
             return best_boom
@@ -331,7 +364,6 @@ class Agent:
 
         # If nothing is good
         if best_strategy is None:
-            print("lose")
             # We lose anyways
             moves = self.available_states(game_state, self.player)
             return random.choice(moves)[0]
@@ -411,7 +443,7 @@ class Agent:
 
             if away_b == away_a:
                 continue
-            if not temp_game.get_game_state()[self.player] or (home_a - away_a) < trade_threshold:
+            if not temp_game.get_game_state()[self.player] or home_a < trade_threshold:
                 strategy = self.monte_carlo(game_state, simulations, search_depth)
                 return strategy
             if not temp_game.get_game_state()[self.other]:
@@ -437,12 +469,12 @@ class Agent:
                 closest_ally = ally
                 closest_enemy = enemy
 
-        width = closest_ally[1] - closest_enemy[1]
-        height = closest_ally[2] - closest_enemy[2]
+        width = closest_enemy[1] - closest_ally[1]
+        height = closest_enemy[2] - closest_ally[2]
 
-        if width == 0 and closest_ally[0] >= height:
+        if width == 0 and closest_ally[0] >= abs(height):
             xy = closest_enemy[1], closest_enemy[2] - np.sign(height)
-        elif height == 0 and closest_ally[0] >= width:
+        elif height == 0 and closest_ally[0] >= abs(width):
             xy = closest_enemy[1] - np.sign(width), closest_enemy[2]
         else:
             xy = closest_enemy[1], closest_enemy[2]
@@ -656,11 +688,14 @@ class Agent:
 
         return string_n * string_n * (1 - value / n)
 
+    # Old
     # Finds the 'children' of current game state
     def available_states(self, game_state, player):
         available = []
         all_available = []
         other = game.other_player(player)
+
+        home_b, away_b = features.count_all(game_state, player)
 
         for piece in game_state[player]:
             xy = piece[1], piece[2]
@@ -676,23 +711,16 @@ class Agent:
                     temp_game.boom(xy, player)
                     temp_game_state = temp_game.get_game_state()
 
-                    all_available.append([(None, xy, move, None), temp_game.get_game_state()])
+                    all_available.append([(None, xy, move, None), temp_game_state])
 
-                    # If current number of home pieces <= current number of away pieces
-                    if features.count_pieces(game_state[player]) < features.count_pieces(game_state[other]):
-                        home_diff = features.count_pieces(game_state[player]) - features.count_pieces(temp_game_state[player])
-                        away_diff = features.count_pieces(game_state[other]) - features.count_pieces(temp_game_state[other])
-
-                        # Not worth it to trade for less
-                        if home_diff >= away_diff:
-                            continue
+                    home_a, away_a = features.count_all(temp_game_state, player)
 
                     # If suicide for nothing
-                    if features.count_pieces(game_state[other]) == features.count_pieces(temp_game_state[other]):
-                        # Don't
+                    if away_a == away_b or self.is_bad_boom(home_b, home_a, away_b, away_a):
                         continue
 
                     available.append([(None, xy, move, None), temp_game.get_game_state()])
+
                 else:
                     if piece[0] == 1:
                         amounts = [1]
@@ -701,7 +729,7 @@ class Agent:
                     else:
                         amount = min(piece[0], 8)
                         # Move whole stack or leave one or move one
-                        amounts = [1, amount]
+                        amounts = [1, amount, amount-1]
 
                     for n in amounts:
                         for distance in range(piece[0]):
@@ -711,11 +739,22 @@ class Agent:
                                 temp_game.move_token(n, xy, move, distance, player)
                                 xy2 = game.dir_to_xy(xy, move, distance)
 
-                                if n == 1 and not self.has_potential_threat(xy2, self.other):
+                                # Don't break stack if not moving to attack
+                                if piece[0] != 1 and n == 1 and not self.has_potential_threat(xy2, self.other):
+                                    continue
+                                # Don't break stack if not running away and leaving
+                                if (piece[0] > 2 and n == piece[0] - 1) \
+                                        and not self.has_potential_threat(xy, self.other):
                                     continue
 
                                 # We don't like a v pattern (inefficient move)
                                 if self.creates_v(temp_game, xy2):
+                                    continue
+                                if move in ["Up", "Down"] and (self.creates_v(temp_game, (xy[0] + 1, xy[1]))
+                                                               or self.creates_v(temp_game, (xy[0] - 1, xy[1]))):
+                                    continue
+                                if move in ["Left", "Right"] and (self.creates_v(temp_game, (xy[0], xy[1] + 1))
+                                                                  or self.creates_v(temp_game, (xy[0], xy[1] - 1))):
                                     continue
 
                                 available.append([(n, xy, move, distance), temp_game.get_game_state()])
@@ -725,18 +764,120 @@ class Agent:
 
         return available
 
+    # New
+    """
+    def available_states(self, game_state, player, get_all=False):
+        available = []
+        all_rational_available = []
+        all_available = []
+
+        home_b, away_b = features.count_all(game_state, player)
+
+        for piece in game_state[player]:
+            xy = piece[1], piece[2]
+            available_moves = tokens.available_moves(player)
+
+            for move in available_moves:
+                if move == "Boom":
+                    temp_game = game.Game(game_state)
+
+                    if not temp_game.has_surrounding(xy):
+                        continue
+
+                    temp_game.boom(xy, player)
+
+                    all_available.append([(None, xy, move, None), temp_game.get_game_state()])
+
+                    home_a, away_a = features.count_all(temp_game.get_game_state(), player)
+
+                    # If suicide for nothing
+                    if away_b == away_a:
+                        # Don't
+                        continue
+
+                    all_rational_available.append([(None, xy, move, None), temp_game.get_game_state()])
+
+                    if self.is_bad_boom(home_b, home_a, away_b, away_a):
+                        continue
+
+                    available.append([(None, xy, move, None), temp_game.get_game_state()])
+
+                else:
+                    # Not optimal to move in between unless you have really good strategies
+                    if piece[0] == 1:
+                        amounts = [1]
+                    elif piece[0] == 2:
+                        amounts = [1, 2]
+                    else:
+                        amount = min(piece[0], 8)
+                        # Move whole stack or leave one or move one
+                        amounts = [1, amount, amount - 1]
+
+                    for n in range(piece[0]):
+                        n = piece[0] - n
+                        for distance in range(piece[0]):
+                            distance = piece[0] - distance
+                            temp_game = game.Game(game_state)
+                            if temp_game.is_valid_move(xy, move, distance, player):
+                                temp_game.move_token(n, xy, move, distance, player)
+                                xy2 = game.dir_to_xy(xy, move, distance)
+
+                                all_available.append([(n, xy, move, distance), temp_game.get_game_state()])
+
+                                potential_threat = self.has_potential_threat(xy2, self.other)
+
+                                # Moving into a trap
+                                #if potential_threat and self.suicide_move(temp_game, player, xy2):
+                                #    continue
+
+                                all_rational_available.append([(n, xy, move, distance), temp_game.get_game_state()])
+
+                                if self.player == player and n not in amounts:
+                                    continue
+
+                                if piece[0] != 1 and n == 1 and not potential_threat:
+                                    continue
+
+                                # We don't like a v pattern (inefficient move)
+                                if self.creates_v(temp_game, xy2):
+                                    continue
+                                if move in ["Up", "Down"] and (self.creates_v(temp_game, (xy[0] + 1, xy[1]))
+                                                               or self.creates_v(temp_game, (xy[0] - 1, xy[1]))):
+                                    continue
+                                if move in ["Left", "Right"] and (self.creates_v(temp_game, (xy[0], xy[1] + 1))
+                                                                  or self.creates_v(temp_game, (xy[0], xy[1] - 1))):
+                                    continue
+
+                                # We don't like a v pattern (inefficient move)
+                                if self.creates_v(temp_game, xy2):
+                                    continue
+
+                                if temp_game.get_game_state()[self.player] in self.past_states:
+                                    continue
+
+                                available.append([(n, xy, move, distance), temp_game.get_game_state()])
+
+        if player != self.player or len(available) == 0 or get_all:
+            if len(all_rational_available) == 0:
+                return all_available
+            else:
+                return all_rational_available
+
+        return available
+    """
+
     def suicide_move(self, game_, player, xy):
         curr_state = game_.get_game_state()
+        temp_game = game.Game(curr_state)
         home_b, away_b = features.count_all(curr_state, player)
 
         # Us booming is the same as someone adj booming on their next turn
-        game_.boom(xy, player)
-        next_state = game_.get_game_state()
+        temp_game.boom(xy, player)
+        next_state = temp_game.get_game_state()
         home_a, away_a = features.count_all(next_state, player)
 
         if self.is_bad_boom(home_b, home_a, away_b, away_a):
             return True
-
         return False
 
     # Subject to change
@@ -745,18 +886,20 @@ class Agent:
         diff_b = home_b - away_b
         diff_a = home_a - away_a
 
+        if home_a == 0:
+            return True
         # If less or equal pieces and the difference between pieces increase
         if home_b <= away_b and diff_b > diff_a:
             return True
         # If more pieces, don't accept a boom that will reduce our lead
         if home_b > away_b and diff_b >= diff_a:
             return True
-        if home_a == 0:
-            return True
-
         return False
 
     def creates_v(self, game_, xy):
+        if tokens.out_of_board(xy):
+            return False
+
         ally_pieces, all_pieces = self.count_adjacent(self.other, xy, game_=game_)
 
         checked = False
@@ -806,7 +949,7 @@ class Agent:
         elif game_state[self.other] and not game_state[self.player]:
             weight_score = 0
         else:
-            weight_score = 0.25
+            weight_score = 0
 
         total_score = self.weight_score + weight_score
         games_played = self.weight_games + 1

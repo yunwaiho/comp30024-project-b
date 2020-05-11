@@ -54,12 +54,12 @@ class ExamplePlayer:
         search_depth = 2
 
         ##################opening book change
-        #action = None
+        action = None
 
-        #if opening_book.check_early_game():
-        #    action = self.opening_book.next_move()
-        #    if action:
-        #        return action
+        if self.opening_book.check_early_game():
+            action = self.opening_book.next_move()
+            if action:
+                return action
         ########################################
 
         if self.away_tokens == 1 and self.home_tokens >= 1:

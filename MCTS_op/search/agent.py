@@ -166,13 +166,13 @@ class Agent:
         uct_sim = float("-inf")
 
         can_boom = False
-        best_boom_diff = 0
+        best_boom_diff = float("-inf")
         best_strategy = None
         best_boom = None
 
         home_c = features.count_pieces(game_state[self.player])
         away_c = features.count_pieces(game_state[self.other])
-        diff_c = home_c - away_c
+        diff_c = self.value_diff(game_state, self.player)
 
         potential_threat = self.has_potential_threat(self.away_recently_moved, self.player)
 
@@ -182,13 +182,11 @@ class Agent:
             temp_game = game.Game(game_state)
             temp_game.boom(self.away_recently_moved, self.other)
             temp_game_state = temp_game.get_game_state()
-            home_t = features.count_pieces(temp_game_state[self.player])
-            away_t = features.count_pieces(temp_game_state[self.other])
-            potential_diff = home_t - away_t
+            potential_diff = self.value_diff(temp_game_state, self.player)
             run_aways = []
 
             # If is bad boom for the other player
-            if potential_diff == diff_c or self.is_bad_boom(away_c, away_t, home_c, home_t):
+            if potential_diff == diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
                 potential_threat = False
 
             print(potential_threat, potential_diff)
@@ -218,20 +216,14 @@ class Agent:
                     continue
 
                 if not potential_threat and self.has_potential_threat(xy, self.other):
-                    home_b = features.count_pieces(next_state[self.player])
-                    away_b = features.count_pieces(next_state[self.other])
-
                     temp_game = game.Game(next_state)
                     temp_game.boom(xy, self.player)
                     temp_game_state = temp_game.get_game_state()
 
-                    home_a = features.count_pieces(temp_game_state[self.player])
-                    away_a = features.count_pieces(temp_game_state[self.other])
-
-                    if self.is_bad_boom(home_b, home_a, away_b, away_a):
+                    if self.is_bad_boom(next_state, temp_game_state, self.player):
                         continue
 
-                    offensive.append((home_a - away_a, strategy))
+                    offensive.append((self.value_diff(temp_game_state, self.player), strategy))
 
                 if potential_threat:
 
@@ -241,30 +233,21 @@ class Agent:
                     temp_game = game.Game(next_state)
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
-
-                    home_l = features.count_pieces(temp_game_state[self.player])
-                    away_l = features.count_pieces(temp_game_state[self.other])
-                    loss = home_l - away_l
+                    loss = self.value_diff(temp_game_state, self.player)
 
                     if self.has_potential_threat(xy, self.other):
                         # Potential gains from moving
                         temp_game = game.Game(next_state)
                         temp_game.boom(xy, self.player)
                         temp_game_state = temp_game.get_game_state()
-
-                        home_g1 = features.count_pieces(temp_game_state[self.player])
-                        away_g1 = features.count_pieces(temp_game_state[self.other])
-                        gain = home_g1 - away_g1
+                        gain = self.value_diff(temp_game_state, self.player)
 
                         # Same Cluster boomed or Moving to trade is not worth it
                         if gain > loss:
                             trade_game = temp_game
                             trade_game.boom(self.away_recently_moved, self.other)
                             trade_game_state = trade_game.get_game_state()
-
-                            home_o = features.count_pieces(trade_game_state[self.player])
-                            away_o = features.count_pieces(trade_game_state[self.other])
-                            outcome = home_o - away_o
+                            outcome = self.value_diff(trade_game_state, self.player)
 
                             # Minimise Losses by trading
                             run_aways.append((outcome, strategy))
@@ -282,20 +265,15 @@ class Agent:
                 if potential_threat and not temp_game.board.is_cell_empty(self.away_recently_moved):
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
-
-                    home_a = features.count_pieces(temp_game_state[self.player])
-                    away_a = features.count_pieces(temp_game_state[self.other])
                 else:
-                    home_a = features.count_pieces(next_state[self.player])
-                    away_a = features.count_pieces(next_state[self.other])
-
-                    if self.is_bad_boom(home_c, home_a, away_c, away_a):
+                    temp_game_state = temp_game.get_game_state()
+                    if self.is_bad_boom(game_state, temp_game_state, self.player):
                         continue
 
-                diff = home_a - away_a
+                diff = self.value_diff(temp_game_state, self.player)
 
                 if ((home_c < away_c and diff >= diff_c) or (home_c >= away_c and diff > diff_c)) \
-                        and diff > best_boom_diff:
+                        or (home_c == away_c and diff == diff_c) and diff > best_boom_diff:
                     best_boom_diff = diff
                     best_boom = strategy
                     can_boom = True
@@ -307,7 +285,7 @@ class Agent:
             all_strategies.append(strategy)
 
         if potential_threat:
-            print(run_aways)
+            print(sorted(run_aways, reverse=True))
             print("new")
             print("all", all_moves)
             print("parsed", all_strategies)
@@ -372,6 +350,25 @@ class Agent:
             return node, True
 
         return next_best_node, False
+
+    @staticmethod
+    def value_diff(game_state, player):
+        home_val = 0
+        away_val = 0
+
+        for piece in game_state[player]:
+            if piece[0] == 1:
+                home_val += 1
+            else:
+                home_val += piece[0] + 1
+
+        for piece in game_state[game.other_player(player)]:
+            if piece[0] == 1:
+                away_val += 1
+            else:
+                away_val += piece[0] + 1
+
+        return home_val - away_val
 
     def one_enemy_endgame(self, game_state, simulations, search_depth, trade_threshold):
         return self.trade_tokens(game_state, simulations, search_depth, trade_threshold)
@@ -684,7 +681,6 @@ class Agent:
     def available_states(self, game_state, player):
         available = []
         all_available = []
-        other = game.other_player(player)
 
         home_b, away_b = features.count_all(game_state, player)
 
@@ -707,7 +703,7 @@ class Agent:
                     home_a, away_a = features.count_all(temp_game_state, player)
 
                     # If suicide for nothing
-                    if away_a == away_b or self.is_bad_boom(home_b, home_a, away_b, away_a):
+                    if away_a == away_b or self.is_bad_boom(game_state, temp_game_state, player):
                         continue
 
                     available.append([(None, xy, move, None), temp_game.get_game_state()])
@@ -893,22 +889,22 @@ class Agent:
     def suicide_move(self, game_, player, xy):
         curr_state = game_.get_game_state()
         temp_game = game.Game(curr_state)
-        home_b, away_b = features.count_all(curr_state, player)
 
         # Us booming is the same as someone adj booming on their next turn
         temp_game.boom(xy, player)
         next_state = temp_game.get_game_state()
-        home_a, away_a = features.count_all(next_state, player)
 
-        if self.is_bad_boom(home_b, home_a, away_b, away_a):
+        if self.is_bad_boom(curr_state, next_state, player):
             return True
         return False
 
     # Subject to change
-    @staticmethod
-    def is_bad_boom(home_b, home_a, away_b, away_a):
-        diff_b = home_b - away_b
-        diff_a = home_a - away_a
+    def is_bad_boom(self, game_state_b, game_state_a, player):
+        diff_b = self.value_diff(game_state_b, player)
+        diff_a = self.value_diff(game_state_a, player)
+        home_b = features.count_pieces(game_state_b[player])
+        home_a = features.count_pieces(game_state_a[player])
+        away_b = features.count_pieces(game_state_a[game.other_player(player)])
 
         if home_a == 0:
             return True

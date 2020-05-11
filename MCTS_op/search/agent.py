@@ -172,6 +172,7 @@ class Agent:
 
         home_c = features.count_pieces(game_state[self.player])
         away_c = features.count_pieces(game_state[self.other])
+        diff_c = home_c - away_c
 
         potential_threat = self.has_potential_threat(self.away_recently_moved, self.player)
 
@@ -187,7 +188,7 @@ class Agent:
             run_aways = []
 
             # If is bad boom for the other player
-            if self.is_bad_boom(away_c, away_t, home_c, home_t):
+            if potential_diff == diff_c or self.is_bad_boom(away_c, away_t, home_c, home_t):
                 potential_threat = False
 
             print(potential_threat, potential_diff)
@@ -277,9 +278,11 @@ class Agent:
             if strategy[2] == "Boom":
 
                 temp_game = game.Game(next_state)
+
                 if potential_threat and not temp_game.board.is_cell_empty(self.away_recently_moved):
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
+
                     home_a = features.count_pieces(temp_game_state[self.player])
                     away_a = features.count_pieces(temp_game_state[self.other])
                 else:
@@ -291,7 +294,8 @@ class Agent:
 
                 diff = home_a - away_a
 
-                if ((home_c < away_c and diff >= 0) or (home_c >= away_c and diff > 0)) and diff > best_boom_diff:
+                if ((home_c < away_c and diff >= diff_c) or (home_c >= away_c and diff > diff_c)) \
+                        and diff > best_boom_diff:
                     best_boom_diff = diff
                     best_boom = strategy
                     can_boom = True
@@ -318,7 +322,7 @@ class Agent:
                 best_move = run_aways[0][1]
                 best_move_diff = run_aways[0][0]
 
-            if best_boom_diff > best_move_diff:
+            if best_boom_diff >= best_move_diff:
                 # Trade first
                 if best_boom_diff > potential_diff and can_boom:
                     print("BOOM")
@@ -338,7 +342,8 @@ class Agent:
 
         # If nothing is good
         if best_strategy is None:
-            return self.random_valid_move(game_state, self.player)
+            print("hellooo")
+            return self.random_valid_move(game_state, self.player)[0]
 
         return best_strategy
 
@@ -400,6 +405,14 @@ class Agent:
             # Close enough to boom
             if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
                 return None, ally_xy, "Boom", None
+
+            width = enemy_xy[0] - ally_xy[0]
+            height = enemy_xy[1] - ally_xy[1]
+
+            if width == 0 and abs(height) <= ally[0]:
+                return self.go_there(2, ally, (enemy_xy[0], enemy_xy[1] - np.sign(height)))
+            if height == 0 and abs(width) <= ally[0]:
+                return self.go_there(2, ally, (enemy_xy[0] - np.sign(width), enemy_xy[1]))
 
             enemy_corner_xy = self.get_nearest_corner(ally_xy, enemy_xy)
             move = self.go_there(2, ally, enemy_corner_xy)

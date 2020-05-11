@@ -58,8 +58,13 @@ class OpenBook:
             if boom_diff:
                 print("boom_diff", boom_diff)
                 boom_diff_np = np.array(boom_diff)
-                index = np.argmax(boom_diff_np)
-                return boom_move[index]
+                max = np.max(boom_diff)
+                if max <=0:
+                    self.is_early_game = False
+                    return None
+                else:
+                    index = np.argmax(boom_diff_np)
+                    return boom_move[index]
 
         self.is_early_game = False
         return None

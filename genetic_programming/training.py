@@ -24,7 +24,7 @@ def main():
 
         os.chdir(original)
 
-        evolve(iteration, select=0.4, stragglers=0.1, mutate=0.05, variance=0.5)
+        evolve(iteration, select=0.4, stragglers=0.1, mutate=0.05, variance=20)
 
         with open("iterations.json") as file:
             scores = json.load(file)
@@ -107,7 +107,7 @@ def evolve(iteration, select, stragglers, mutate, variance):
             IQR = q3-q1
             traits = parents[feature]
 
-            child[feature] = traits.dot(weight) + np.random.normal(scale=IQR*variance)
+            child[feature] = traits.dot(weight) + np.random.normal(scale=variance)
 
         children = children.append(child, ignore_index=True)
 
@@ -123,7 +123,7 @@ def evolve(iteration, select, stragglers, mutate, variance):
                 q3 = new_pop[feature].quantile(0.75)
                 q1 = new_pop[feature].quantile(0.25)
                 IQR = q3 - q1
-                new_pop.iloc[i, j] += np.random.normal(scale=1.5*IQR*variance)
+                new_pop.iloc[i, j] += np.random.normal(scale=1.5*variance)
 
     score = np.zeros(n)
     games = np.zeros(n)

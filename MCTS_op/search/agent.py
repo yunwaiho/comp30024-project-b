@@ -166,7 +166,7 @@ class Agent:
         uct_sim = float("-inf")
 
         can_boom = False
-        best_boom_diff = float("-inf")
+        best_boom_diff = 0
         best_strategy = None
         best_boom = None
 

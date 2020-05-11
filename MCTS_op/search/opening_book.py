@@ -29,7 +29,6 @@ class OpenBook:
         self.boom_book = get_boom_book()
 
     # Decides the next move
-    @property
     def next_move(self):
         dict_move = self.early_game_turn + 1
         boom_diff = []
@@ -43,7 +42,7 @@ class OpenBook:
             avail_moves = self.book[dict_move][self.other_player_move]
             boom_check_move = self.boom_book[self.player][self.other_player_move]
 
-            print("dict_move:", dict_move, avail_moves, self.other_player_move)
+            #print("dict_move:", dict_move, avail_moves, self.other_player_move)
             if avail_moves is None:
                 self.is_early_game = False
                 return None
@@ -175,6 +174,7 @@ class OpenBook:
 
 #######################################################################################
 # Dictionaries for opening moves
+
 def get_boom_book():
     book = {
         "white":
@@ -286,40 +286,64 @@ def black_opening_book():
     }
     return book
 
-
-# Old book
 '''
+# Old book
+def get_boom_book():
+    book = {
+        "white":
+            {
+                "L": [7],
+                "CR": [5],
+                "CL": [5],
+                "R": [7]
+            },
+        "black":
+            {
+                "L": [7],
+                "CR": [7],
+                "CL": [5],
+                "R": [7]
+            }
+    }
+    return book
+
 def white_opening_book():
     book = {
         1: [("MOVE", 1, (0, 1), (1, 1))],
         2: {
             "L": [("MOVE", 1, (1, 0), (1, 1))],
-            "C": [("MOVE", 1, (4, 1), (3, 1))],
+            "CL": [("MOVE", 1, (4, 1), (3, 1))],
+            "CR": [("MOVE", 1, (4, 1), (3, 1))],
             "R": [("MOVE", 1, (7, 1), (6, 1))]
         },
         3: {
             "L": [("MOVE", 3, (1, 1), (4, 1))],
-            "C": [("MOVE", 2, (3, 1), (1, 1))],
+            "CL": [("MOVE", 2, (3, 1), (1, 1))],
+            "CR": [("MOVE", 2, (3, 1), (1, 1))],
             "R": [("MOVE", 2, (6, 1), (4, 1))]
         },
         4: {
             "L": [("MOVE", 1, (4, 0), (4, 1))],
-            "C": [("MOVE", 1, (1, 1), (1, 5))],
+            "CL": [("MOVE", 1, (1, 1), (1, 5))],
+            "CR": [("MOVE", 1, (1, 1), (1, 5))],
             "R": [("MOVE", 3, (4, 1), (2, 1))]
         },
         5: {
             "L": [("MOVE", 1, (4, 1), (4, 6)), ("MOVE", 5, (4, 1), (5, 1))],
-            "C": [("BOOM", (1, 5))],
+            "CL": [("BOOM", (1, 5))],
+            "CR": [("BOOM", (1, 5))],
             "R": [("MOVE", 2, (1, 1), (2, 1))]
         },
         6: {
             "L": [("MOVE", 1, (4, 6), (5, 6)), ("MOVE", 1, (5, 1), (5, 6))],
-            "C": [("MOVE", 1, (3, 0), (4, 0))],
+            "CL": [("MOVE", 1, (3, 0), (4, 0))],
+            "CR": [("MOVE", 1, (3, 0), (4, 0))],
             "R": [("MOVE", 1, (2, 1), (2, 6)), ("MOVE", 1, (2, 1), (2, 5))]
         },
         7: {
             "L": [("BOOM", (5, 6))],
-            "C": [("MOVE", 2, (4, 0), (6, 0))],
+            "CL": [("MOVE", 2, (4, 0), (6, 0))],
+            "CR": [("MOVE", 2, (4, 0), (6, 0))],
             "R": [("BOOM", (2, 6)), ("BOOM", (2, 5))]
         }
     }
@@ -376,5 +400,5 @@ def black_opening_book():
 
     }
     return book
-
 '''
+

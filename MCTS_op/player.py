@@ -51,7 +51,7 @@ class ExamplePlayer:
         self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
         simulations = 10*self.home_tokens
-        search_depth = 1
+        search_depth = 2
 
         ##################opening book change
         #action = None

@@ -134,10 +134,10 @@ class ExamplePlayer:
         self.game_state = self.game.get_game_state()
         #self.agent.update_root(self.game_state)
 
-    def end(self):
+    def end(self, limit):
 
         game_state = self.game.get_game_state()
-        self.agent.update_weights(game_state)
+        self.agent.update_weights(game_state, limit)
 
         with open("genetic_programming/score.json") as file:
             data = json.load(file)

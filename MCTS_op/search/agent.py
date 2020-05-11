@@ -205,7 +205,7 @@ class Agent:
                     if self.is_bad_boom(next_state, temp_game_state, self.player):
                         continue
 
-                    offensive.append((self.value_diff(temp_game_state, self.player), strategy))
+                    offensive.append((self.value_diff(temp_game_state, self.player), child.uct, strategy))
 
                 if potential_threat:
                     # Losses from moving
@@ -229,12 +229,14 @@ class Agent:
                             outcome = self.value_diff(trade_game_state, self.player)
 
                             # Minimise Losses by trading
-                            run_aways.append((outcome, strategy))
+                            run_aways.append((outcome, child.uct, strategy))
 
                     else:
                         # Minimise Losses by Running
                         if loss > potential_diff:
-                            run_aways.append((loss, strategy))
+                            run_aways.append((loss, child.uct, strategy))
+                        else:
+                            continue
 
             # If can trade for more
             if strategy[2] == "Boom":
@@ -251,8 +253,8 @@ class Agent:
 
                 diff = self.value_diff(temp_game_state, self.player)
 
-                if ((home_c < away_c and diff >= diff_c) or (home_c >= away_c and diff > diff_c)) \
-                        or (home_c == away_c and diff == diff_c) and diff > best_boom_diff:
+                if diff > best_boom_diff and \
+                        ((home_c < away_c and diff > diff_c) or (home_c >= away_c and diff >= diff_c)):
                     best_boom_diff = diff
                     best_boom = strategy
                     can_boom = True
@@ -269,7 +271,7 @@ class Agent:
             # Run away
             if len(run_aways) != 0:
                 run_aways = sorted(run_aways, reverse=True)
-                best_move = run_aways[0][1]
+                best_move = run_aways[0][2]
                 best_move_diff = run_aways[0][0]
 
             if best_boom_diff >= best_move_diff:
@@ -286,7 +288,7 @@ class Agent:
 
         if len(offensive) != 0:
             offensive = sorted(offensive, reverse=True)
-            return offensive[0][1]
+            return offensive[0][2]
 
         # If nothing is good
         if best_strategy is None:
@@ -400,20 +402,21 @@ class Agent:
                                 # Don't break stack if not moving to attack
                                 if piece[0] != 1 and n == 1 and not self.has_potential_threat(xy2, self.other):
                                     continue
-                                # Don't break stack if not running away and leaving
-                                if (piece[0] > 2 and n == piece[0] - 1) \
-                                        and not self.has_potential_threat(xy, self.other):
-                                    continue
 
-                                # We don't like a v pattern (inefficient move)
-                                if self.creates_v(temp_game, xy2):
-                                    continue
-                                if move in ["Up", "Down"] and (self.creates_v(temp_game, (xy[0] + 1, xy[1]))
-                                                               or self.creates_v(temp_game, (xy[0] - 1, xy[1]))):
-                                    continue
-                                if move in ["Left", "Right"] and (self.creates_v(temp_game, (xy[0], xy[1] + 1))
-                                                                  or self.creates_v(temp_game, (xy[0], xy[1] - 1))):
-                                    continue
+                                if not self.has_potential_threat(xy, self.other):
+                                    #  Don't break stack if not running away and leaving
+                                    if piece[0] > 2 and n == piece[0] - 1:
+                                        continue
+
+                                    # We don't like a v pattern (inefficient move)
+                                    if self.creates_v(temp_game, xy2):
+                                        continue
+                                    if move in ["Up", "Down"] and (self.creates_v(temp_game, (xy[0] + 1, xy[1]))
+                                                                   or self.creates_v(temp_game, (xy[0] - 1, xy[1]))):
+                                        continue
+                                    if move in ["Left", "Right"] and (self.creates_v(temp_game, (xy[0], xy[1] + 1))
+                                                                      or self.creates_v(temp_game, (xy[0], xy[1] - 1))):
+                                        continue
 
                                 available.append([(n, xy, move, distance), temp_game.get_game_state()])
 
@@ -762,10 +765,10 @@ class Agent:
         if home_a == 0:
             return True
         # If less or equal pieces and the difference between pieces increase
-        if home_b <= away_b and diff_b > diff_a:
+        if home_b < away_b and diff_b >= diff_a:
             return True
         # If more pieces, don't accept a boom that will reduce our lead
-        if home_b > away_b and diff_b >= diff_a:
+        if home_b >= away_b and diff_b > diff_a:
             return True
         return False
 
@@ -810,19 +813,22 @@ class Agent:
 
         return False
 
-    def update_weights(self, game_state):
+    def update_weights(self, game_state, limit):
 
-        # Win
-        if game_state[self.player] and not game_state[self.other]:
-            if self.player == "black":
-                weight_score = 1
+        if not limit:
+            # Win
+            if game_state[self.player] and not game_state[self.other]:
+                if self.player == "black":
+                    weight_score = 1
+                else:
+                    weight_score = 1
+            # Lose
+            elif game_state[self.other] and not game_state[self.player]:
+                weight_score = 0
             else:
-                weight_score = 1
-        # Lose
-        elif game_state[self.other] and not game_state[self.player]:
-            weight_score = 0
+                weight_score = 0
         else:
-            weight_score = 0
+            weight_score = -1
 
         total_score = self.weight_score + weight_score
         games_played = self.weight_games + 1

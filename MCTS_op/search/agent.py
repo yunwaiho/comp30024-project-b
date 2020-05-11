@@ -368,8 +368,8 @@ class Agent:
 
         return next_best_node, False
 
-    def one_enemy_endgame(self, game_state, simulations, search_depth):
-        return self.trade_tokens(game_state, simulations, search_depth, 1)
+    def one_enemy_endgame(self, game_state, simulations, search_depth, trade_threshold):
+        return self.trade_tokens(game_state, simulations, search_depth, trade_threshold)
 
     # Doesn't take into account draws
     def two_enemy_endgame(self, game_state, simulations, search_depth, trade_threshold):

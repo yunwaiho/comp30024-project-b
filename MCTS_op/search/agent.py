@@ -192,7 +192,7 @@ class Agent:
         uct_sim = float("-inf")
 
         can_boom = False
-        best_boom_diff = float("-inf")
+        best_boom_diff = 0
         best_strategy = None
         best_boom = None
 
@@ -212,8 +212,11 @@ class Agent:
             potential_diff = home_t - away_t
             run_aways = []
 
-            if self.is_bad_boom(home_c, home_t, away_c, away_t):
+            # If is bad boom for the other player
+            if self.is_bad_boom(away_c, away_t, home_c, home_t):
                 potential_threat = False
+
+            print(potential_threat, potential_diff)
 
         for child in root.seen:
             strategy = child.move
@@ -250,7 +253,7 @@ class Agent:
                     offensive.append((home_a - away_a, strategy))
 
                 if potential_threat:
-                    # Losses
+                    # Losses from moving
                     temp_game = game.Game(next_state)
                     temp_game.boom(self.away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
@@ -259,7 +262,7 @@ class Agent:
                     away_l = features.count_pieces(temp_game_state[self.other])
                     loss = home_l - away_l
 
-                    # Gains
+                    # Potential gains from moving
                     temp_game = game.Game(next_state)
                     temp_game.boom(xy, self.player)
                     temp_game_state = temp_game.get_game_state()
@@ -280,9 +283,10 @@ class Agent:
                         away_o = features.count_pieces(trade_game_state[self.other])
                         outcome = home_o - away_o
 
+                        # Minimise Losses by trading
                         run_aways.append((outcome, strategy))
 
-                    # Minimise Losses
+                    # Minimise Losses by Running
                     if loss > potential_diff:
                         run_aways.append((loss, strategy))
 
@@ -305,14 +309,15 @@ class Agent:
                 best_strategy = strategy
 
         if potential_threat:
-            best_move_diff = float("-inf")
+            print(run_aways)
+            best_move_diff = 0
 
             # Run away
             if len(run_aways) != 0:
                 run_aways = sorted(run_aways, reverse=True)
                 best_move = run_aways[0][1]
                 best_move_diff = run_aways[0][0]
-
+            
             # Trade first
             if best_boom_diff > potential_diff and can_boom:
                 if best_move_diff > best_boom_diff:
@@ -407,7 +412,7 @@ class Agent:
 
             if away_b == away_a:
                 continue
-            if not temp_game.get_game_state()[self.player] or (home_a - away_a) < trade_threshold:
+            if not temp_game.get_game_state()[self.player] or home_a < trade_threshold:
                 strategy = self.monte_carlo(game_state, simulations, search_depth)
                 return strategy
             if not temp_game.get_game_state()[self.other]:
@@ -810,7 +815,7 @@ class Agent:
         elif game_state[self.other] and not game_state[self.player]:
             weight_score = 0
         else:
-            weight_score = 0.25
+            weight_score = 0
 
         total_score = self.weight_score + weight_score
         games_played = self.weight_games + 1

@@ -51,23 +51,24 @@ class ExamplePlayer:
         self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
         simulations = 10*self.home_tokens
-        search_depth = 1
+        search_depth = 2
 
         ##################opening book change
-        action = None
+        #action = None
 
-        if opening_book.check_early_game():
-            action = self.opening_book.next_move()
-            if action:
-                return action
+        #if opening_book.check_early_game():
+        #    action = self.opening_book.next_move()
+        #    if action:
+        #        return action
         ########################################
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
             strategy = self.agent.one_enemy_endgame(self.game_state, simulations, search_depth)
         elif self.away_tokens == 2 and self.home_tokens >= 2:
             strategy = self.agent.two_enemy_endgame(self.game_state, simulations, search_depth)
-        elif self.away_tokens <= self.trading_prop < self.home_tokens:
-            strategy = self.agent.trade_tokens(self.game_state, simulations, search_depth, self.trading_prop)
+        elif (self.away_tokens <= self.trading_prop or self.home_tokens - self.away_tokens > self.trading_prop)\
+                and self.away_tokens < self.home_tokens:
+            strategy = self.agent.trade_tokens(self.game_state, simulations, search_depth, self.away_tokens+1)
         else:
             strategy = self.agent.monte_carlo(self.game_state, simulations, search_depth)
 

@@ -24,7 +24,7 @@ def main():
 
         os.chdir(original)
 
-        evolve(iteration, select=0.3, stragglers=0.1, mutate=0.05, variance=50)
+        evolve(iteration, select=0.3, stragglers=0.1, mutate=0.1, variance=50)
 
         with open("iterations.json") as file:
             scores = json.load(file)
@@ -85,8 +85,6 @@ def evolve(iteration, select, stragglers, mutate, variance):
     while not plane_has_landed:
         straggler = df.sample(1).loc[:, feature_names + ["accuracy"]]
         feature_index = features.index
-        if straggler["accuracy"] <= 0:
-            continue
 
         if len(straggler.index.difference(feature_index)) == 0:
             features = features.append(straggler)
@@ -138,7 +136,7 @@ def evolve(iteration, select, stragglers, mutate, variance):
 
 
 def simulate_games():
-    os.system("python3 -m referee -c -t 90 MCTS_op MCTS_op")
+    os.system("python3 -m referee -c MCTS_op MCTS_op")
 
 
 def survive(n, iteration):

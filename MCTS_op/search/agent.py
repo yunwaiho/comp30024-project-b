@@ -546,15 +546,18 @@ class Agent:
             enemy = game_state[self.other][0]
             enemy_xy = enemy[1], enemy[2]
 
+            for piece in game_state[self.player]:
+                temp_game = game.Game(game_state)
+                temp_game.boom((piece[1], piece[2]), self.player)
+
+                if temp_game.get_game_state()[self.player] and not temp_game.get_game_state()[self.other]:
+                    return None, (piece[1], piece[2]), "Boom", None
+
             ally = self.closest_npiece(game_state, 2, self.player, enemy_xy)
             if ally is None:
                 return self.make_stack(game_state)
 
             ally_xy = ally[1], ally[2]
-
-            # Close enough to boom
-            if abs(enemy_xy[0] - ally_xy[0]) <= 1 and abs(enemy_xy[1] - ally_xy[1]) <= 1:
-                return None, ally_xy, "Boom", None
 
             width = enemy_xy[0] - ally_xy[0]
             height = enemy_xy[1] - ally_xy[1]
@@ -828,7 +831,7 @@ class Agent:
             else:
                 weight_score = 0
         else:
-            weight_score = -1
+            weight_score = 0
 
         total_score = self.weight_score + weight_score
         games_played = self.weight_games + 1

@@ -50,8 +50,8 @@ class ExamplePlayer:
         self.home_tokens = sum([x[0] for x in self.game_state[self.colour]])
         self.away_tokens = sum([x[0] for x in self.game_state[game.other_player(self.colour)]])
 
-        simulations = 10*self.home_tokens
-        search_depth = 2
+        simulations = 9*len(self.game_state[self.colour])
+        search_depth = 3
 
         ##################opening book change
         #action = None
@@ -132,7 +132,6 @@ class ExamplePlayer:
         self.agent.turn = self.turn // 2
 
         self.game_state = self.game.get_game_state()
-        #self.agent.update_root(self.game_state)
 
     def end(self, limit):
 

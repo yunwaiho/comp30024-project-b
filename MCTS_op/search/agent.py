@@ -170,7 +170,7 @@ class Agent:
         from math import sqrt
 
         game_state = root.data
-        uct_sim = float("-inf")
+        n_sim = float("-inf")
 
         can_boom = False
         best_boom_diff = float("-inf")
@@ -316,8 +316,8 @@ class Agent:
                     best_boom = strategy
                     can_boom = True
 
-            if child.uct > uct_sim:
-                uct_sim = child.uct
+            if child.n > n_sim:
+                n_sim = child.n
                 best_strategy = strategy
 
         if potential_threat:

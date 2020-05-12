@@ -8,7 +8,6 @@ import MCTS_op.search.features as features
 
 # MCTS taken from pseudocode on geeksforgeeks
 
-
 class Agent:
 
     def __init__(self, game_, player, past_states, trade_prop):
@@ -32,6 +31,8 @@ class Agent:
         self.weight_score = data.iloc[0, 1]
         self.weight_games = data.iloc[0, 2]
         self.weights = data.iloc[0, 3:].astype(np.float)
+
+        self.strategies = 0
 
     class Node:
 
@@ -78,7 +79,17 @@ class Agent:
         self.root = self.Node(self, (None, game_state), self.player, None)
         self.root.n = 1
 
+        is_quiet = self.quiet()
+        all_simulated = False
+
         for i in range(simulations):
+            if not all_simulated and len(self.root.seen) != 0 and not is_quiet:
+                best_move = self.best_child(self.root, all_simulated)
+                if best_move is None:
+                    all_simulated = True
+                else:
+                    return best_move
+
             path = [self.root]
             leaf = self.selection(self.root, path)
             simulation_score = self.rollout(game_state, leaf, depth)
@@ -109,8 +120,6 @@ class Agent:
         node = leaf
         game_state = node.data
 
-        from datetime import datetime
-
         while depth != 0 and not game.end(game_state):
             node = self.rollout_policy(node)
             game_state = node.data
@@ -128,7 +137,6 @@ class Agent:
 
         game_state = node.data
         player = node.player
-        temp_game = game.Game(game_state)
 
         # Assume opponent is random
         if player != self.player:
@@ -149,7 +157,16 @@ class Agent:
             node.update_stats(result)
             node = node.parent
 
-    def best_child(self, root):
+    def quiet(self):
+
+        potential_threat1 = self.has_potential_threat(self.away_recently_moved_to, self.player)
+        potential_threat2 = self.has_potential_threat(self.away_recently_moved_from, self.player)
+
+        if potential_threat1 or potential_threat2:
+            return False
+        return True
+
+    def best_child(self, root, all_simulated=True):
         from math import sqrt
 
         game_state = root.data
@@ -173,25 +190,27 @@ class Agent:
         if potential_threat1 and potential_threat2:
             potential_threat = True
 
-            temp_game = game.Game(game_state)
-            temp_game.boom(self.away_recently_moved_to, self.other)
-            temp_game_state = temp_game.get_game_state()
-            potential_diff1 = self.value_diff(temp_game_state, self.player)
+            temp_game1 = game.Game(game_state)
+            temp_game1.boom(self.away_recently_moved_to, self.other)
+            temp_game_state1 = temp_game1.get_game_state()
+            potential_diff1 = self.value_diff(temp_game_state1, self.player)
 
-            temp_game = game.Game(game_state)
-            temp_game.boom(self.away_recently_moved_from, self.other)
-            temp_game_state = temp_game.get_game_state()
-            potential_diff2 = self.value_diff(temp_game_state, self.player)
+            temp_game2 = game.Game(game_state)
+            temp_game2.boom(self.away_recently_moved_from, self.other)
+            temp_game_state2 = temp_game2.get_game_state()
+            potential_diff2 = self.value_diff(temp_game_state2, self.player)
 
-            potential_diff = max(potential_diff1, potential_diff2)
+            potential_diff = min(potential_diff1, potential_diff2)
             if potential_diff1 <= potential_diff2:
                 away_recently_moved = self.away_recently_moved_to
+                # If is bad boom for the other player
+                if potential_diff1 >= diff_c or self.is_bad_boom(game_state, temp_game_state1, self.other):
+                    potential_threat = False
             else:
                 away_recently_moved = self.away_recently_moved_from
-
-            # If is bad boom for the other player
-            if potential_diff >= diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
-                potential_threat = False
+                # If is bad boom for the other player
+                if potential_diff2 >= diff_c or self.is_bad_boom(game_state, temp_game_state2, self.other):
+                    potential_threat = False
         else:
             if potential_threat1:
                 potential_threat = True
@@ -328,6 +347,9 @@ class Agent:
             offensive = sorted(offensive, reverse=True)
             return offensive[0][2]
 
+        if not all_simulated:
+            return None
+
         # If nothing is good
         if best_strategy is None:
             return self.random_valid_move(game_state, self.player)[0]
@@ -371,8 +393,8 @@ class Agent:
             return -score
 
     # Can be replaced with another node utility function
-    def utility(self, curr_state, next_state, player):
-        return self.evaluation(curr_state, next_state, player)
+    def utility(self, next_state, player):
+        return self.value_diff(next_state, player)
 
     def get_node_utility(self, game_state, player):
         unvisited_children = []
@@ -380,7 +402,7 @@ class Agent:
         next_moves = self.available_states(game_state, player)
 
         for strategy, next_state in next_moves:
-            unvisited_children.append((self.utility(game_state, next_state, player), (strategy, next_state)))
+            unvisited_children.append((self.utility(next_state, player), (strategy, next_state)))
 
         indices = [(x[0], i) for i, x in enumerate(unvisited_children)]
 

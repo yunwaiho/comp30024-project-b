@@ -53,14 +53,12 @@ class ExamplePlayer:
         simulations = 14*len(self.game_state[self.colour])
         search_depth = 3
 
-        ##################opening book change
-        #action = None
+        action = None
 
-        #if self.opening_book.check_early_game():
-        #    action = self.opening_book.next_move
-        #    if action:
-        #        return action
-        ########################################
+        if self.opening_book.check_early_game():
+            action = self.opening_book.next_move()
+            if action:
+                return action
 
         if self.away_tokens == 1 and self.home_tokens >= 1:
             strategy = self.agent.one_enemy_endgame(self.game_state, simulations, search_depth, 1)

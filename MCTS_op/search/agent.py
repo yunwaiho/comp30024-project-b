@@ -23,16 +23,16 @@ class Agent:
         self.away_recently_moved_from = None
         self.root = None
 
-        weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+        self.weights = np.array([380.17, -361.62,810.72, -333.62,356.67, -294.56, -137.97])
 
-        data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
+        # Used for genetic programming
+        #weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
+        #data = weights.sample(axis=0, random_state=random.randint(0, 1000000))
+        #self.weight_index = data.iloc[0, 0]
+        #self.weight_score = data.iloc[0, 1]
+        #self.weight_games = data.iloc[0, 2]
+        #self.weights = data.iloc[0, 3:].astype(np.float)
 
-        self.weight_index = data.iloc[0, 0]
-        self.weight_score = data.iloc[0, 1]
-        self.weight_games = data.iloc[0, 2]
-        self.weights = data.iloc[0, 3:].astype(np.float)
-
-        self.strategies = 0
 
     class Node:
 
@@ -187,6 +187,7 @@ class Agent:
         potential_threat1 = self.has_potential_threat(self.away_recently_moved_to, self.player)
         potential_threat2 = self.has_potential_threat(self.away_recently_moved_from, self.player)
 
+        # If there is a threat
         if potential_threat1 and potential_threat2:
             potential_threat = True
 
@@ -254,6 +255,7 @@ class Agent:
                 if damage == features.count_pieces(next_state[self.player]):
                     continue
 
+                # If no threat and can go on the offensive
                 if not potential_threat and self.has_potential_threat(xy, self.other):
                     temp_game = game.Game(next_state)
                     temp_game.boom(xy, self.player)
@@ -264,6 +266,7 @@ class Agent:
 
                     offensive.append((self.value_diff(temp_game_state, self.player), child.uct, strategy))
 
+                # React to threat
                 if potential_threat:
                     # Losses from moving
                     temp_game = game.Game(next_state)
@@ -300,6 +303,7 @@ class Agent:
 
                 temp_game = game.Game(next_state)
 
+                # React to threat
                 if potential_threat and not temp_game.board.is_cell_empty(away_recently_moved):
                     temp_game.boom(away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
@@ -316,6 +320,7 @@ class Agent:
                     best_boom = strategy
                     can_boom = True
 
+            # Chose best child
             if child.uct > uct_sim:
                 uct_sim = child.uct
                 best_strategy = strategy

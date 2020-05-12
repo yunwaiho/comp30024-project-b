@@ -20,8 +20,8 @@ class Agent:
         self.turn = 0
         self.past_states = past_states
 
-        self.away_recently_moved = None
-        self.home_recently_moved = None
+        self.away_recently_moved_to = None
+        self.away_recently_moved_from = None
         self.root = None
 
         weights = pd.read_csv("genetic_programming/weights.csv", sep=",", header=[0])
@@ -159,25 +159,63 @@ class Agent:
         best_boom_diff = float("-inf")
         best_strategy = None
         best_boom = None
+        potential_threat = False
+        run_aways = []
+        offensive = []
 
         home_c = features.count_pieces(game_state[self.player])
         away_c = features.count_pieces(game_state[self.other])
         diff_c = self.value_diff(game_state, self.player)
 
-        potential_threat = self.has_potential_threat(self.away_recently_moved, self.player)
+        potential_threat1 = self.has_potential_threat(self.away_recently_moved_to, self.player)
+        potential_threat2 = self.has_potential_threat(self.away_recently_moved_from, self.player)
 
-        offensive = []
+        if potential_threat1 and potential_threat2:
+            potential_threat = True
 
-        if potential_threat:
             temp_game = game.Game(game_state)
-            temp_game.boom(self.away_recently_moved, self.other)
+            temp_game.boom(self.away_recently_moved_to, self.other)
             temp_game_state = temp_game.get_game_state()
-            potential_diff = self.value_diff(temp_game_state, self.player)
-            run_aways = []
+            potential_diff1 = self.value_diff(temp_game_state, self.player)
+
+            temp_game = game.Game(game_state)
+            temp_game.boom(self.away_recently_moved_from, self.other)
+            temp_game_state = temp_game.get_game_state()
+            potential_diff2 = self.value_diff(temp_game_state, self.player)
+
+            potential_diff = max(potential_diff1, potential_diff2)
+            if potential_diff1 <= potential_diff2:
+                away_recently_moved = self.away_recently_moved_to
+            else:
+                away_recently_moved = self.away_recently_moved_from
 
             # If is bad boom for the other player
-            if potential_diff == diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
+            if potential_diff >= diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
                 potential_threat = False
+        else:
+            if potential_threat1:
+                potential_threat = True
+                away_recently_moved = self.away_recently_moved_to
+
+                temp_game = game.Game(game_state)
+                temp_game.boom(away_recently_moved, self.other)
+                temp_game_state = temp_game.get_game_state()
+                potential_diff = self.value_diff(temp_game_state, self.player)
+
+                if potential_diff >= diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
+                    potential_threat = False
+
+            if potential_threat2:
+                potential_threat = True
+                away_recently_moved = self.away_recently_moved_from
+
+                temp_game = game.Game(game_state)
+                temp_game.boom(away_recently_moved, self.other)
+                temp_game_state = temp_game.get_game_state()
+                potential_diff = self.value_diff(temp_game_state, self.player)
+
+                if potential_diff >= diff_c or self.is_bad_boom(game_state, temp_game_state, self.other):
+                    potential_threat = False
 
         for child in root.seen:
             strategy = child.move
@@ -210,7 +248,7 @@ class Agent:
                 if potential_threat:
                     # Losses from moving
                     temp_game = game.Game(next_state)
-                    temp_game.boom(self.away_recently_moved, self.other)
+                    temp_game.boom(away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
                     loss = self.value_diff(temp_game_state, self.player)
 
@@ -224,7 +262,7 @@ class Agent:
                         # Same Cluster boomed or Moving to trade is not worth it
                         if gain > loss:
                             trade_game = temp_game
-                            trade_game.boom(self.away_recently_moved, self.other)
+                            trade_game.boom(away_recently_moved, self.other)
                             trade_game_state = trade_game.get_game_state()
                             outcome = self.value_diff(trade_game_state, self.player)
 
@@ -243,8 +281,8 @@ class Agent:
 
                 temp_game = game.Game(next_state)
 
-                if potential_threat and not temp_game.board.is_cell_empty(self.away_recently_moved):
-                    temp_game.boom(self.away_recently_moved, self.other)
+                if potential_threat and not temp_game.board.is_cell_empty(away_recently_moved):
+                    temp_game.boom(away_recently_moved, self.other)
                     temp_game_state = temp_game.get_game_state()
                 else:
                     temp_game_state = temp_game.get_game_state()

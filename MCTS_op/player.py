@@ -121,12 +121,14 @@ class ExamplePlayer:
             xy1 = action[2]
             xy2 = action[3]
 
-            self.game.board.move_token(n, xy1, xy2, check_valid=False)
+            if colour != self.colour:
+                if n == self.game.board.get_size(xy1):
+                    self.agent.away_recently_moved_from = None
+                else:
+                    self.agent.away_recently_moved_from = xy1
+                self.agent.away_recently_moved_to = xy2
 
-            if colour == self.colour:
-                self.agent.home_recently_moved = xy2
-            else:
-                self.agent.away_recently_moved = xy2
+            self.game.board.move_token(n, xy1, xy2, check_valid=False)
 
         self.turn += 1
         self.agent.turn = self.turn // 2
